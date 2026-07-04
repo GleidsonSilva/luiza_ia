@@ -145,7 +145,7 @@ MOUTH_Y = FY + 12
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
     _cabelo_atras(c)
-    _filled_oval(c, FX, FY, 36, 22, PELE)
+    _filled_oval(c, FX, FY, 36, 25, PELE)
     _franja(c)
     _lacinho(c)
 
