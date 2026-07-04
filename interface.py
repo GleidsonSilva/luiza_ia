@@ -31,7 +31,6 @@ FRAME = Color(160, 100, 70)
 PICTURE = Color(230, 215, 195)
 RUG = Color(210, 160, 180)
 DRESS = Color(180, 180, 240)
-DRESS_CT = Color(120, 100, 180)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
@@ -151,15 +150,24 @@ def _tapete(c):
     _filled_oval(c, FX, 67, 30, 4, RUG)
 
 def _janela(c):
-    for y in range(4, 36):
-        for x in range(110, 119):
+    for y in range(3, 21):
+        for x in range(103, 120):
             c.set_pixel(x, y, WINDOW_GLASS)
-    c.draw_line(110, 4, 118, 4, FRAME)
-    c.draw_line(110, 4, 110, 35, FRAME)
-    c.draw_line(118, 4, 118, 35, FRAME)
-    c.draw_line(110, 35, 118, 35, FRAME)
-    c.draw_line(114, 4, 114, 35, FRAME)
-    c.draw_line(110, 20, 118, 20, FRAME)
+    c.draw_line(103, 3, 119, 3, FRAME)
+    c.draw_line(103, 3, 103, 20, FRAME)
+    c.draw_line(119, 3, 119, 20, FRAME)
+    c.draw_line(103, 20, 119, 20, FRAME)
+    c.draw_line(111, 3, 111, 20, FRAME)
+    c.draw_line(103, 11, 119, 11, FRAME)
+
+def _quadro_janela(c):
+    for y in range(7, 16):
+        for x in range(107, 115):
+            c.set_pixel(x, y, PICTURE)
+    c.draw_line(106, 6, 115, 6, FRAME)
+    c.draw_line(106, 6, 106, 16, FRAME)
+    c.draw_line(115, 6, 115, 16, FRAME)
+    c.draw_line(106, 16, 115, 16, FRAME)
 
 def _lua_estrelas(c):
     _filled_circle(c, 16, 10, 6, MOON)
@@ -171,15 +179,7 @@ def _lua_estrelas(c):
         c.set_pixel(sx, sy + 2, STAR)
         c.set_pixel(sx + 1, sy - 1, STAR)
 
-def _quadro(c):
-    for y in range(24, 38):
-        for x in range(104, 116):
-            c.set_pixel(x, y, PICTURE)
-    c.draw_line(103, 23, 116, 23, FRAME)
-    c.draw_line(103, 23, 103, 38, FRAME)
-    c.draw_line(116, 23, 116, 38, FRAME)
-    c.draw_line(103, 38, 116, 38, FRAME)
-
+ 
 def _chao(c):
     for y in range(66, H):
         for x in range(W):
@@ -193,8 +193,6 @@ def _corpo(c):
         half = 12 + (y - 59) // 2
         for x in range(FX - half, FX + half + 1):
             c.set_pixel(x, y, DRESS)
-    c.draw_line(FX - 13, 59, FX - 20, 71, DRESS_CT)
-    c.draw_line(FX + 13, 59, FX + 20, 71, DRESS_CT)
 
 def _cabelo_atras(c):
     _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
@@ -220,8 +218,8 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     _chao(c)
     _tapete(c)
     _janela(c)
+    _quadro_janela(c)
     _lua_estrelas(c)
-    _quadro(c)
     _corpo(c)
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
