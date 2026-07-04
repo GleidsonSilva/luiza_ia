@@ -248,50 +248,51 @@ def key_pressed() -> bool:
     return False
 
 nome_crianca = mem.get("crianca", {}).get("nome", "")
-if nome_crianca:
-    print(f"Ola {nome_crianca}! A Luiza ja esta aqui!")
-else:
-    print("Ola! Eu sou a Luiza! Qual o seu nome?")
-
-print("ENTER para falar, ENTER de novo para parar")
-
 buf = []
 stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
                         callback=lambda i, f, t, s: buf.append(i.copy()))
 stream.start()
 
-while True:
-    while select.select([sys.stdin], [], [], 0)[0]:
-        sys.stdin.readline()
-    input("\nPressione ENTER para falar com a Luiza...")
+if __name__ == "__main__":
+    if nome_crianca:
+        print(f"Ola {nome_crianca}! A Luiza ja esta aqui!")
+    else:
+        print("Ola! Eu sou a Luiza! Qual o seu nome?")
 
-    idx = len(buf)
-    print("Falando... (ENTER para parar)", end="", flush=True)
-    inicio = time.time()
+    print("ENTER para falar, ENTER de novo para parar")
 
     while True:
-        time.sleep(0.05)
-        if key_pressed():
-            print("")
-            break
-        if time.time() - inicio > MAX_DURATION:
-            print(" (tempo maximo)")
-            break
+        while select.select([sys.stdin], [], [], 0)[0]:
+            sys.stdin.readline()
+        input("\nPressione ENTER para falar com a Luiza...")
 
-    full = np.concatenate(buf[idx:])
+        idx = len(buf)
+        print("Falando... (ENTER para parar)", end="", flush=True)
+        inicio = time.time()
 
-    print("Entendendo...")
-    texto = transcrever(full)
+        while True:
+            time.sleep(0.05)
+            if key_pressed():
+                print("")
+                break
+            if time.time() - inicio > MAX_DURATION:
+                print(" (tempo maximo)")
+                break
 
-    if not texto:
-        print("Nao entendi. Pode falar de novo?")
-        continue
+        full = np.concatenate(buf[idx:])
 
-    print(f"  Voce: {texto}")
+        print("Entendendo...")
+        texto = transcrever(full)
 
-    print("Pensando...")
-    resposta = perguntar(texto)
-    print(f"  Luiza: {resposta}")
+        if not texto:
+            print("Nao entendi. Pode falar de novo?")
+            continue
 
-    print("Falando...")
-    falar(resposta)
+        print(f"  Voce: {texto}")
+
+        print("Pensando...")
+        resposta = perguntar(texto)
+        print(f"  Luiza: {resposta}")
+
+        print("Falando...")
+        falar(resposta)

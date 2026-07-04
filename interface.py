@@ -1,0 +1,293 @@
+import threading
+import numpy as np
+import assistente
+
+from textual.app import App, ComposeResult
+from textual.reactive import reactive
+from textual.widgets import Static
+from textual.containers import Container, Horizontal
+from textual_canvas import Canvas
+from textual.color import Color
+
+W, H = 80, 50
+FX, FY = 40, 28
+
+PELE = Color(255, 228, 196)
+OLHO = Color(74, 55, 40)
+BRANCO = Color(255, 255, 255)
+BLUSH = Color(255, 182, 193)
+BOCA_COR = Color(212, 114, 106)
+FUNDO = Color(255, 248, 240)
+
+MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
+               "open_medium", "open_small", "slight"]
+STATUS_MAP = {
+    "idle":          "[#888]⬤ Pronta[/]",
+    "ouvindo":       "[#4CAF50]⬤ Ouvindo...[/]",
+    "transcrevendo": "[#FFC107]⬤ Entendendo...[/]",
+    "pensando":      "[#2196F3]⬤ Pensando...[/]",
+    "falando":       "[#9C27B0]⬤ Falando...[/]",
+}
+
+def _filled_oval(c, cx, cy, rx, ry, color):
+    for dy in range(-ry, ry + 1):
+        for dx in range(-rx, rx + 1):
+            if (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1:
+                c.set_pixel(cx + dx, cy + dy, color)
+
+def _filled_circle(c, cx, cy, r, color):
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            if dx * dx + dy * dy <= r * r:
+                c.set_pixel(cx + dx, cy + dy, color)
+
+def _olho(c, cx, cy, estilo):
+    _filled_circle(c, cx, cy, 5, BRANCO)
+    c.draw_circle(cx, cy, 5, OLHO)
+    if estilo == "normal":
+        _filled_circle(c, cx, cy, 3, OLHO)
+        c.set_pixel(cx + 1, cy - 1, BRANCO)
+    elif estilo == "happy":
+        _filled_circle(c, cx, cy, 3, OLHO)
+        c.set_pixel(cx + 1, cy - 1, BRANCO)
+        c.draw_line(cx - 5, cy + 4, cx + 5, cy + 4, OLHO)
+    elif estilo == "focused":
+        _filled_circle(c, cx, cy, 2, OLHO)
+    elif estilo == "up":
+        _filled_circle(c, cx - 1, cy - 2, 2, OLHO)
+
+def _boca_curva(c, cx, cy, abertura, largura):
+    for dx in range(-largura, largura + 1):
+        dy = int((dx * dx) / (largura * largura / abertura) - abertura / 2)
+        c.set_pixel(cx + dx, cy - dy, BOCA_COR)
+
+def _boca_retang(c, cx, cy, w, h):
+    for dy in range(h):
+        for dx in range(-w, w + 1):
+            c.set_pixel(cx + dx, cy + dy, BOCA_COR)
+
+def _boca(c, cx, cy, forma):
+    if forma == "smile":
+        _boca_curva(c, cx, cy, 5, 9)
+    elif forma == "slight":
+        _boca_curva(c, cx, cy, 3, 7)
+    elif forma == "open_small":
+        _boca_retang(c, cx, cy, 3, 3)
+    elif forma == "open_medium":
+        _boca_retang(c, cx, cy, 4, 4)
+    elif forma == "open_large":
+        _boca_retang(c, cx, cy, 5, 5)
+    elif forma == "thinking":
+        for dx in range(-5, 6):
+            c.set_pixel(cx + dx, cy, BOCA_COR)
+        c.set_pixel(cx - 5, cy + 1, BOCA_COR)
+        c.set_pixel(cx + 5, cy + 1, BOCA_COR)
+    elif forma == "surprised":
+        _filled_circle(c, cx, cy, 3, BOCA_COR)
+    elif forma == "open_wide":
+        _boca_retang(c, cx, cy, 6, 5)
+
+def _blush(c):
+    _filled_circle(c, 14, 30, 4, BLUSH)
+    _filled_circle(c, 66, 30, 4, BLUSH)
+
+def _sobrancelhas(c, estilo):
+    if estilo == "neutra":
+        c.draw_line(16, 12, 30, 12, OLHO)
+        c.draw_line(50, 12, 64, 12, OLHO)
+    elif estilo == "franzida":
+        c.draw_line(14, 14, 28, 10, OLHO)
+        c.draw_line(52, 10, 66, 14, OLHO)
+    elif estilo == "curiosa":
+        c.draw_line(16, 10, 28, 14, OLHO)
+        c.draw_line(52, 14, 64, 10, OLHO)
+
+def desenhar_rosto(c, expressao, frame_boca):
+    c.clear()
+    _filled_oval(c, FX, FY, 32, 24, PELE)
+
+    if expressao == "idle":
+        _sobrancelhas(c, "neutra")
+        _olho(c, 24, 20, "normal")
+        _olho(c, 56, 20, "normal")
+        _blush(c)
+        _boca(c, FX, 38, "smile")
+    elif expressao == "ouvindo":
+        _sobrancelhas(c, "curiosa")
+        _olho(c, 24, 20, "normal")
+        _olho(c, 56, 20, "normal")
+        _blush(c)
+        _boca(c, FX, 38, "smile")
+    elif expressao == "transcrevendo":
+        _sobrancelhas(c, "franzida")
+        _olho(c, 24, 20, "focused")
+        _olho(c, 56, 20, "focused")
+        _boca(c, FX, 38, "thinking")
+    elif expressao == "pensando":
+        _sobrancelhas(c, "neutra")
+        _olho(c, 24, 18, "up")
+        _olho(c, 56, 18, "up")
+        _boca(c, FX, 38, "surprised")
+    elif expressao == "falando":
+        _sobrancelhas(c, "neutra")
+        _olho(c, 24, 20, "happy")
+        _olho(c, 56, 20, "happy")
+        _blush(c)
+        _boca(c, FX, 38, MOUTH_CYCLE[frame_boca])
+
+
+class LuizaApp(App[None]):
+    CSS = """
+    Screen {
+        background: #FFF8F0;
+    }
+
+    #face-wrapper {
+        height: 27;
+        align: center middle;
+    }
+
+    Canvas {
+        background: #FFF8F0;
+        width: 80;
+        height: 27;
+    }
+
+    #status {
+        height: 1;
+        content-align: center middle;
+        margin-bottom: 1;
+    }
+
+    .bubble-row {
+        height: 3;
+        margin: 0 4;
+    }
+
+    .label {
+        height: 1;
+        color: #888;
+        text-style: bold;
+        margin: 0 4;
+        margin-top: 1;
+    }
+
+    .label-luiza {
+        color: #D4726A;
+    }
+
+    .bubble {
+        background: #FFFFFF;
+        border: solid #CCC;
+        padding: 0 2;
+        height: 3;
+        margin: 0 4;
+    }
+
+    .bubble-luiza {
+        border: solid #D4726A;
+    }
+
+    #hint {
+        height: 1;
+        color: #AAA;
+        text-align: center;
+        margin-top: 1;
+    }
+    """
+
+    BINDINGS = [
+        ("space", "toggle_recording", "Falar"),
+        ("q", "quit", "Sair"),
+    ]
+
+    expressao = reactive("idle")
+    _frame_boca = 0
+
+    def __init__(self):
+        super().__init__()
+        self.gravando = False
+        self.recording_idx = 0
+
+    def compose(self) -> ComposeResult:
+        with Container(id="face-wrapper"):
+            yield Canvas(W, H, canvas_color=FUNDO, id="rosto")
+        yield Static(STATUS_MAP["idle"], id="status")
+        yield Static("Você:", classes="label")
+        yield Static("", id="stt-text", classes="bubble")
+        yield Static("Luiza:", classes="label label-luiza")
+        yield Static("", id="tts-text", classes="bubble bubble-luiza")
+        yield Static("[Espaço] Falar  [Q] Sair", id="hint")
+
+    def on_mount(self):
+        self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
+                                             pause=True)
+        self._atualizar_rosto()
+
+    def _avancar_boca(self):
+        self._frame_boca = (self._frame_boca + 1) % len(MOUTH_CYCLE)
+        if self.expressao == "falando":
+            self._atualizar_rosto()
+
+    def _atualizar_rosto(self):
+        canvas = self.query_one("#rosto", Canvas)
+        with canvas.batch_refresh():
+            desenhar_rosto(canvas, self.expressao, self._frame_boca)
+
+    def _mudar_expressao(self, expressao):
+        self.expressao = expressao
+        self._frame_boca = 0
+        self._atualizar_rosto()
+        status = self.query_one("#status", Static)
+        status.update(STATUS_MAP.get(expressao, ""))
+        if expressao == "falando":
+            self._boca_timer.resume()
+        else:
+            self._boca_timer.pause()
+
+    def action_toggle_recording(self):
+        if self.gravando:
+            self._parar_gravacao()
+        else:
+            self._iniciar_gravacao()
+
+    def _iniciar_gravacao(self):
+        self.gravando = True
+        self.recording_idx = len(assistente.buf)
+        self._mudar_expressao("ouvindo")
+        self.query_one("#stt-text", Static).update("")
+        self.query_one("#tts-text", Static).update("")
+
+    def _parar_gravacao(self):
+        self.gravando = False
+        self._mudar_expressao("transcrevendo")
+        audio = np.concatenate(assistente.buf[self.recording_idx:])
+        threading.Thread(target=self._processar, args=(audio,),
+                         daemon=True).start()
+
+    def _processar(self, audio):
+        texto = assistente.transcrever(audio)
+        if not texto:
+            self.call_from_thread(self._voltar_idle)
+            return
+
+        self.call_from_thread(self._atualizar_stt, texto)
+        self.call_from_thread(self._mudar_expressao, "pensando")
+
+        resposta = assistente.perguntar(texto)
+
+        self.call_from_thread(self._mudar_expressao, "falando")
+        self.call_from_thread(self._atualizar_tts, resposta)
+
+        assistente.falar(resposta)
+
+        self.call_from_thread(self._voltar_idle)
+
+    def _atualizar_stt(self, texto):
+        self.query_one("#stt-text", Static).update(texto)
+
+    def _atualizar_tts(self, texto):
+        self.query_one("#tts-text", Static).update(texto)
+
+    def _voltar_idle(self):
+        self._mudar_expressao("idle")
