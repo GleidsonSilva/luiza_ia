@@ -122,9 +122,8 @@ def _cabelo_atras(c):
     _filled_oval(c, FX + 48, FY - 10, 18, 28, CABELO)
 
 def _franja(c):
-    for x, y, r in [(36,17,3), (42,15,4), (48,18,3), (54,16,4), (60,19,3),
-                     (66,16,4), (72,18,3), (78,15,4), (84,17,3)]:
-        _filled_circle(c, x, y, r, CABELO)
+    for x in range(33, 90, 6):
+        _filled_oval(c, x, 10, 4, 7, CABELO)
 
 EYE_L = FX - 27
 EYE_R = FX + 27
