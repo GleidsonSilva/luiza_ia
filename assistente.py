@@ -1,6 +1,11 @@
 import sys, os, json, tempfile, select, time, re, threading
 
-os.environ["TQDM_DISABLE"] = "1"
+import tqdm.std
+tqdm.std.TqdmDefaultWriteLock.mp_lock = threading.RLock()
+tqdm.std.TqdmDefaultWriteLock.create_mp_lock = classmethod(
+    lambda cls: setattr(cls, "mp_lock", threading.RLock())
+)
+
 from datetime import datetime
 import numpy as np
 import sounddevice as sd
