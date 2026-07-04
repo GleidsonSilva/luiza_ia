@@ -322,12 +322,24 @@ class LuizaApp(App[None]):
     """
 
     BINDINGS = [
-        ("space", "toggle_recording", "Falar"),
         ("escape", "quit", "Sair"),
     ]
 
     def action_quit(self):
         self.exit()
+
+    def _on_key_down(self, event):
+        if event.key == "escape":
+            self.exit()
+            event.stop()
+        elif event.key == "space" and not self.processando and not self.gravando:
+            self._iniciar_gravacao()
+            event.stop()
+
+    def _on_key_up(self, event):
+        if event.key == "space" and self.gravando:
+            self._parar_gravacao()
+            event.stop()
 
     expressao = reactive("idle")
     _frame_boca = 0
