@@ -1,4 +1,4 @@
-import threading, random
+import threading, random, time
 import numpy as np
 import assistente
 
@@ -322,24 +322,26 @@ class LuizaApp(App[None]):
     """
 
     BINDINGS = [
+        ("space", "toggle_recording", "Falar"),
         ("escape", "quit", "Sair"),
     ]
+
+    _ultimo_toggle: float = 0.0
 
     def action_quit(self):
         self.exit()
 
-    def _on_key_down(self, event):
-        if event.key == "escape":
-            self.exit()
-            event.stop()
-        elif event.key == "space" and not self.processando and not self.gravando:
-            self._iniciar_gravacao()
-            event.stop()
-
-    def _on_key_up(self, event):
-        if event.key == "space" and self.gravando:
+    def action_toggle_recording(self):
+        agora = time.monotonic()
+        if agora - self._ultimo_toggle < 0.3:
+            return
+        self._ultimo_toggle = agora
+        if self.processando:
+            return
+        if self.gravando:
             self._parar_gravacao()
-            event.stop()
+        else:
+            self._iniciar_gravacao()
 
     expressao = reactive("idle")
     _frame_boca = 0
@@ -351,6 +353,7 @@ class LuizaApp(App[None]):
         self.processando = False
         self.recording_idx = 0
         self._olho_dir = (0, 0)
+        self._silencio_count = 0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -365,6 +368,8 @@ class LuizaApp(App[None]):
     def on_mount(self):
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
                                              pause=True)
+        self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
+                                                  pause=True)
         self._agendar_piscar()
         self._agendar_olhar()
         self._atualizar_rosto()
@@ -416,22 +421,17 @@ class LuizaApp(App[None]):
         else:
             self._boca_timer.pause()
 
-    def action_toggle_recording(self):
-        if self.processando:
-            return
-        if self.gravando:
-            self._parar_gravacao()
-        else:
-            self._iniciar_gravacao()
-
     def _iniciar_gravacao(self):
         self.gravando = True
         self.recording_idx = len(assistente.buf)
+        self._silencio_count = 0
+        self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
         self.query_one("#stt-text", Static).update("")
         self.query_one("#tts-text", Static).update("")
 
     def _parar_gravacao(self):
+        self._silencio_timer.pause()
         self.gravando = False
         self.processando = True
         self._mudar_expressao("transcrevendo")
@@ -440,6 +440,27 @@ class LuizaApp(App[None]):
         self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),
                          daemon=True).start()
+
+    def _verificar_silencio(self):
+        if not self.gravando:
+            return
+        chunks = []
+        n = 0
+        for chunk in reversed(assistente.buf):
+            chunks.append(chunk)
+            n += len(chunk)
+            if n >= 16000:
+                break
+        if n < 4000:
+            return
+        audio = np.concatenate(list(reversed(chunks)))
+        rms = np.sqrt(np.mean(audio**2))
+        if rms < 0.03:
+            self._silencio_count += 1
+            if self._silencio_count >= 6:
+                self._parar_gravacao()
+        else:
+            self._silencio_count = 0
 
     def _processar(self, audio):
         texto = assistente.transcrever(audio)
