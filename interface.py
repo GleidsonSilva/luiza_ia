@@ -55,19 +55,19 @@ def _filled_circle(c, cx, cy, r, color):
                 c.set_pixel(x, y, color)
 
 def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
-    _filled_circle(c, cx, cy, 7, BRANCO)
-    c.draw_circle(cx, cy, 7, OLHO)
+    _filled_circle(c, cx, cy, 6, BRANCO)
+    c.draw_circle(cx, cy, 6, OLHO)
     if estilo == "normal":
-        _filled_circle(c, cx, cy, 4, OLHO)
+        _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
     elif estilo == "happy":
-        _filled_circle(c, cx, cy, 4, OLHO)
+        _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.draw_line(cx - 7, cy + 6, cx + 7, cy + 6, OLHO)
+        c.draw_line(cx - 5, cy + 5, cx + 5, cy + 5, OLHO)
     elif estilo == "focused":
-        _filled_circle(c, cx + fdx, cy + fdy, 3, OLHO)
+        _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
     elif estilo == "up":
-        _filled_circle(c, cx - 1, cy - 3, 3, OLHO)
+        _filled_circle(c, cx - 1, cy - 2, 2, OLHO)
 
 def _boca_curva(c, cx, cy, abertura, largura):
     for dx in range(-largura, largura + 1):
@@ -81,40 +81,40 @@ def _boca_retang(c, cx, cy, w, h):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 8, 15)
+        _boca_curva(c, cx, cy, 6, 12)
     elif forma == "slight":
-        _boca_curva(c, cx, cy, 5, 12)
+        _boca_curva(c, cx, cy, 4, 9)
     elif forma == "open_small":
-        _boca_retang(c, cx, cy, 4, 4)
+        _boca_retang(c, cx, cy, 3, 3)
     elif forma == "open_medium":
-        _boca_retang(c, cx, cy, 6, 6)
+        _boca_retang(c, cx, cy, 5, 5)
     elif forma == "open_large":
-        _boca_retang(c, cx, cy, 8, 7)
+        _boca_retang(c, cx, cy, 6, 5)
     elif forma == "thinking":
-        for dx in range(-8, 9):
+        for dx in range(-6, 7):
             c.set_pixel(cx + dx, cy, BOCA_COR)
-        c.set_pixel(cx - 8, cy + 1, BOCA_COR)
-        c.set_pixel(cx + 8, cy + 1, BOCA_COR)
+        c.set_pixel(cx - 6, cy + 1, BOCA_COR)
+        c.set_pixel(cx + 6, cy + 1, BOCA_COR)
     elif forma == "surprised":
-        _filled_circle(c, cx, cy, 5, BOCA_COR)
+        _filled_circle(c, cx, cy, 4, BOCA_COR)
     elif forma == "open_wide":
-        _boca_retang(c, cx, cy, 9, 8)
+        _boca_retang(c, cx, cy, 7, 6)
 
 def _blush(c):
-    _filled_circle(c, 17, FY + 3, 6, BLUSH)
-    _filled_circle(c, 103, FY + 3, 6, BLUSH)
+    _filled_circle(c, 23, FY + 2, 5, BLUSH)
+    _filled_circle(c, 97, FY + 2, 5, BLUSH)
 
 def _sobrancelhas(c, estilo):
-    sy = FY - 22
+    sy = FY - 18
     if estilo == "neutra":
-        c.draw_line(21, sy, 45, sy, OLHO)
-        c.draw_line(75, sy, 99, sy, OLHO)
+        c.draw_line(28, sy, 48, sy, OLHO)
+        c.draw_line(72, sy, 92, sy, OLHO)
     elif estilo == "franzida":
-        c.draw_line(18, sy + 3, 42, sy - 3, OLHO)
-        c.draw_line(78, sy - 3, 102, sy + 3, OLHO)
+        c.draw_line(26, sy + 2, 46, sy - 2, OLHO)
+        c.draw_line(74, sy - 2, 94, sy + 2, OLHO)
     elif estilo == "curiosa":
-        c.draw_line(21, sy - 3, 45, sy + 3, OLHO)
-        c.draw_line(75, sy + 3, 99, sy - 3, OLHO)
+        c.draw_line(28, sy - 2, 48, sy + 2, OLHO)
+        c.draw_line(72, sy + 2, 92, sy - 2, OLHO)
 
 def _cabelo_atras(c):
     _filled_oval(c, FX, FY - 18, 56, 24, CABELO)
@@ -123,17 +123,17 @@ def _cabelo_atras(c):
 
 def _franja(c):
     for x in range(33, 90, 6):
-        _filled_oval(c, x, 10, 4, 7, CABELO)
+        _filled_oval(c, x, 14, 4, 7, CABELO)
 
-EYE_L = FX - 27
-EYE_R = FX + 27
-EYE_Y = FY - 12
-MOUTH_Y = FY + 15
+EYE_L = FX - 22
+EYE_R = FX + 22
+EYE_Y = FY - 10
+MOUTH_Y = FY + 12
 
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
     _cabelo_atras(c)
-    _filled_oval(c, FX, FY, 50, 30, PELE)
+    _filled_oval(c, FX, FY, 40, 25, PELE)
     _franja(c)
 
     if expressao == "idle":
