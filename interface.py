@@ -347,7 +347,7 @@ class LuizaApp(App[None]):
         yield Static(" ", id="stt-text", classes="bubble")
         yield Static("Luiza:", classes="label label-luiza")
         yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
-        yield Static("[Espaço] Falar  [Esc] Sair", id="hint")
+        yield Static("\\[Espaço] Falar  \\[Esc] Sair", id="hint")
 
     def on_mount(self):
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
