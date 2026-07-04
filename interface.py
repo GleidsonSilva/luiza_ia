@@ -17,7 +17,7 @@ OLHO = Color(94, 60, 45)
 BRANCO = Color(255, 255, 255)
 BLUSH = Color(255, 130, 160)
 BOCA_COR = Color(235, 70, 75)
-FUNDO = Color(255, 240, 230)
+FUNDO = Color(0, 0, 0)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
@@ -145,7 +145,7 @@ def desenhar_rosto(c, expressao, frame_boca):
 class LuizaApp(App[None]):
     CSS = """
     Screen {
-        background: #FFF0E6;
+        background: #000000;
     }
 
     #face-wrapper {
@@ -154,7 +154,7 @@ class LuizaApp(App[None]):
     }
 
     Canvas {
-        background: #FFF0E6;
+        background: #000000;
         width: 120;
         height: 38;
     }
