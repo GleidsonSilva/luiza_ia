@@ -189,7 +189,7 @@ def perguntar(texto: str) -> str:
     while True:
         r = requests.post(OLLAMA_URL, json={
             "model": MODEL, "messages": messages, "tools": tools, "stream": False
-        })
+        }, timeout=30)
         body = r.json()
         msg = body["message"]
         if msg.get("content"):

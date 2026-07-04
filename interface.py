@@ -329,6 +329,8 @@ class LuizaApp(App[None]):
     _ultimo_toggle: float = 0.0
 
     def action_quit(self):
+        assistente.stream.stop()
+        assistente.stream.close()
         self.exit()
 
     def action_toggle_recording(self):
@@ -463,24 +465,27 @@ class LuizaApp(App[None]):
             self._silencio_count = 0
 
     def _processar(self, audio):
-        texto = assistente.transcrever(audio)
-        if not texto:
+        try:
+            texto = assistente.transcrever(audio)
+            if not texto:
+                self.call_from_thread(self._voltar_idle)
+                return
+
+            self.call_from_thread(self._atualizar_stt, texto)
+            self.call_from_thread(self._mudar_expressao, "pensando")
+
+            resposta = assistente.perguntar(texto)
+
+            self.call_from_thread(self._mudar_expressao, "falando")
+            self.call_from_thread(self._atualizar_tts, resposta)
+
+            assistente.falar(resposta)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        finally:
             self.call_from_thread(self._voltar_idle)
             self.processando = False
-            return
-
-        self.call_from_thread(self._atualizar_stt, texto)
-        self.call_from_thread(self._mudar_expressao, "pensando")
-
-        resposta = assistente.perguntar(texto)
-
-        self.call_from_thread(self._mudar_expressao, "falando")
-        self.call_from_thread(self._atualizar_tts, resposta)
-
-        assistente.falar(resposta)
-
-        self.call_from_thread(self._voltar_idle)
-        self.processando = False
 
     def _atualizar_stt(self, texto):
         self.query_one("#stt-text", Static).update(texto)
