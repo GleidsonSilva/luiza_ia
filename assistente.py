@@ -57,54 +57,6 @@ detetive, palavra secreta
 mem = memoria.carregar()
 historico = []
 
-PITCH_SHIFT = 2.5  # semitons (positivo = mais agudo, infantil)
-
-def pitch_shift(x: np.ndarray, sr: int, n_semitones: float) -> np.ndarray:
-    ratio = 2.0 ** (n_semitones / 12.0)
-    fft_size = 2048
-    hop_size = fft_size // 4
-    original_len = len(x)
-    x = np.pad(x, (0, fft_size))
-    win = np.hanning(fft_size)
-
-    n_frames = 1 + (len(x) - fft_size) // hop_size
-    X = np.zeros((fft_size, n_frames), dtype=complex)
-    for t in range(n_frames):
-        start = t * hop_size
-        X[:, t] = np.fft.fft(x[start:start + fft_size] * win)
-
-    mag = np.abs(X)
-    phase = np.unwrap(np.angle(X), axis=1)
-    delta_phase = np.diff(phase, axis=1)
-    expected = (2 * np.pi * np.arange(fft_size)[:, None] * hop_size / fft_size)
-    inst_freq = (2 * np.pi * np.arange(fft_size)[:, None] / fft_size +
-                 (delta_phase - expected[:, :n_frames-1]) / hop_size)
-
-    Y = np.zeros_like(X, dtype=complex)
-    for k in range(fft_size):
-        ka = k / ratio
-        if ka >= fft_size:
-            continue
-        kl, kr = int(ka), min(int(ka) + 1, fft_size - 1)
-        f = ka - kl
-        mag_k = (1 - f) * mag[kl] + f * mag[kr]
-        f_synth = ((1 - f) * inst_freq[kl] + f * inst_freq[kr]) * ratio
-        ph = np.zeros(n_frames)
-        ph[0] = (1 - f) * phase[kl, 0] + f * phase[kr, 0]
-        for t in range(1, n_frames):
-            ph[t] = ph[t-1] + f_synth[t-1] * hop_size
-        Y[k] = mag_k * np.exp(1j * ph)
-
-    y = np.zeros(len(x))
-    for t in range(n_frames):
-        frame = np.fft.ifft(Y[:, t]).real * win
-        s = t * hop_size
-        y[s:s + fft_size] += frame
-
-    y = y[:original_len]
-    peak = np.max(np.abs(y))
-    return (y / peak * 0.95).astype(np.float32) if peak > 0 else y.astype(np.float32)
-
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     mask = np.abs(audio) > threshold
     idxs = np.where(mask)[0]
@@ -163,8 +115,7 @@ def perguntar(texto: str) -> str:
     return resposta
 
 def falar(texto: str):
-    samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.15, lang="pt-br")
-    samples = pitch_shift(samples, sr, PITCH_SHIFT)
+    samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
     sd.play(samples, sr)
     sd.wait()
 
