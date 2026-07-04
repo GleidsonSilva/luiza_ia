@@ -3,3 +3,4 @@ debug/
 __pycache__/
 *.wav
 memoria.json
+debug.log
