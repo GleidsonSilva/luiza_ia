@@ -268,8 +268,12 @@ def falar(texto: str):
     samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
 
     try:
+        sd.stop()
+        debug.log(f"falar: iniciando playback, samples={len(samples)}")
+        t0 = time.time()
         sd.play(samples, sr, blocksize=1024, latency='low')
         sd.wait()
+        debug.log(f"falar: playback finalizado em {time.time()-t0:.2f}s")
     finally:
         if was_streaming:
             iniciar_stream()
