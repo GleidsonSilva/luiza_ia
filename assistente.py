@@ -257,9 +257,19 @@ def perguntar(texto: str) -> str:
     return resposta
 
 def falar(texto: str):
+    global stream
+    was_streaming = stream is not None
+    if stream:
+        parar_stream()
+
     samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
-    sd.play(samples, sr)
-    sd.wait()
+
+    try:
+        sd.play(samples, sr, blocksize=1024, latency='low')
+        sd.wait()
+    finally:
+        if was_streaming:
+            iniciar_stream()
 
 def key_pressed() -> bool:
     if select.select([sys.stdin], [], [], 0)[0]:
