@@ -72,3 +72,8 @@ def extrair_jogos(texto: str, mem: dict) -> dict:
         if j in texto.lower() and j not in mem["historico_jogos"]:
             mem["historico_jogos"].append(j)
     return mem
+
+def adicionar_fato(mem: dict, chave: str, valor: str) -> dict:
+    mem["crianca"][chave] = valor.strip().capitalize()
+    salvar(mem)
+    return mem

@@ -1,4 +1,4 @@
-import sys, os, tempfile, select, time
+import sys, os, json, tempfile, select, time
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
@@ -39,7 +39,53 @@ Nao use emojis ou simbolos.
 forca, adivinhacao, 20 perguntas, cadeia de palavras,
 o que sou eu, verdadeiro ou falso, rima comigo,
 categorias/stop, complete a frase, historia coletiva,
-detetive, palavra secreta"""
+detetive, palavra secreta
+
+### MEMORIA
+- Quando a crianca disser o nome dela, use a funcao lembrar_nome
+- Quando ela contar algo sobre ela (idade, cor favorita, bichinho, etc), use a funcao lembrar_fato
+- Nao pergunte explicitamente - apenas salve quando ela falar naturalmente"""
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "lembrar_nome",
+            "description": "Salva o nome da crianca quando ela se apresenta",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nome": {
+                        "type": "string",
+                        "description": "Nome da crianca"
+                    }
+                },
+                "required": ["nome"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "lembrar_fato",
+            "description": "Salva uma informacao que a crianca contou sobre ela mesma",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chave": {
+                        "type": "string",
+                        "description": "ex: idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita"
+                    },
+                    "valor": {
+                        "type": "string",
+                        "description": "O valor que a crianca disse"
+                    }
+                },
+                "required": ["chave", "valor"]
+            }
+        }
+    }
+]
 
 mem = memoria.carregar()
 historico = []
@@ -82,22 +128,46 @@ def perguntar(texto: str) -> str:
     messages.extend(historico)
     messages.append({"role": "user", "content": texto})
 
-    r = requests.post(OLLAMA_URL, json={
+    payload = {
         "model": MODEL,
         "messages": messages,
+        "tools": tools,
         "stream": False
-    })
-    resposta = r.json()["message"]["content"].strip()
+    }
+    r = requests.post(OLLAMA_URL, json=payload)
+    body = r.json()
+    msg = body["message"]
+    resposta = msg.get("content", "").strip()
+    tool_calls = msg.get("tool_calls")
 
-    historico.append({"role": "user", "content": texto})
-    historico.append({"role": "assistant", "content": resposta})
-    if len(historico) > MAX_HISTORICO * 2:
-        historico = historico[-(MAX_HISTORICO * 2):]
+    tool_used = False
+    if tool_calls:
+        for tc in tool_calls:
+            fn = tc["function"]
+            name = fn["name"]
+            args = fn.get("arguments", {})
+            if isinstance(args, str):
+                args = json.loads(args)
+            if name == "lembrar_nome" and args.get("nome"):
+                memoria.adicionar_fato(mem, "nome", args["nome"])
+                tool_used = True
+            elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
+                memoria.adicionar_fato(mem, args["chave"], args["valor"])
+                tool_used = True
 
-    memoria.extrair_fatos(texto + " " + resposta, mem)
+    if not tool_used:
+        memoria.extrair_fatos(texto + " " + resposta, mem)
     memoria.extrair_temas(texto + " " + resposta, mem)
     memoria.extrair_jogos(texto + " " + resposta, mem)
     memoria.salvar(mem)
+
+    hist_entry = {"role": "assistant", "content": resposta}
+    if tool_calls:
+        hist_entry["tool_calls"] = tool_calls
+    historico.append({"role": "user", "content": texto})
+    historico.append(hist_entry)
+    if len(historico) > MAX_HISTORICO * 2:
+        historico = historico[-(MAX_HISTORICO * 2):]
 
     return resposta
 
