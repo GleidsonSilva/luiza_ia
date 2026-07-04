@@ -8,6 +8,7 @@ import requests
 from kokoro_onnx import Kokoro
 import memoria
 import contexto
+import debug
 
 SR = 16000
 MAX_DURATION = 15
@@ -150,9 +151,9 @@ def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
 def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
     rms = np.sqrt(np.mean(audio**2)) if len(audio) > 0 else 0
-    print(f"  DBG transcrever: after trim len={len(audio)} rms={rms:.5f}", flush=True)
+    debug.log(f"transcrever: after trim len={len(audio)} rms={rms:.5f}")
     if len(audio) < SR * 0.3:
-        print(f"  DBG: too short ({len(audio)} < {SR * 0.3})", flush=True)
+        debug.log(f"too short ({len(audio)} < {SR * 0.3})")
         return ""
     peak = np.max(np.abs(audio))
     if peak > 0:
@@ -169,9 +170,9 @@ def transcrever(audio: np.ndarray) -> str:
     )
     os.remove(tmp)
     texto = r["text"].strip()
-    print(f"  DBG whisper raw: '{texto}'", flush=True)
+    debug.log(f"whisper raw: '{texto}'")
     if not texto or not re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I):
-        print(f"  DBG: vowel check failed", flush=True)
+        debug.log("vowel check failed")
         return ""
     return texto
 

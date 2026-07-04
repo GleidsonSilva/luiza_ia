@@ -1,6 +1,7 @@
 import threading, random, time
 import numpy as np
 import assistente
+import debug
 
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
@@ -474,9 +475,9 @@ class LuizaApp(App[None]):
 
     def _processar(self, audio):
         try:
-            print(f"  DBG _processar: audio shape={audio.shape}", flush=True)
+            debug.log(f"_processar: audio shape={audio.shape}")
             texto = assistente.transcrever(audio)
-            print(f"  DBG _processar: texto='{texto}'", flush=True)
+            debug.log(f"_processar: texto='{texto}'")
             if not texto:
                 self.call_from_thread(self._voltar_idle)
                 return
@@ -484,9 +485,9 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_stt, texto)
             self.call_from_thread(self._mudar_expressao, "pensando")
 
-            print("  DBG: chamando perguntar...", flush=True)
+            debug.log("chamando perguntar...")
             resposta = assistente.perguntar(texto)
-            print(f"  DBG: resposta='{resposta}'", flush=True)
+            debug.log(f"resposta='{resposta}'")
 
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
@@ -494,9 +495,13 @@ class LuizaApp(App[None]):
             assistente.falar(resposta)
         except Exception as e:
             import traceback
-            traceback.print_exc()
+            import io
+            tb = io.StringIO()
+            traceback.print_exc(file=tb)
+            debug.log(f"ERRO: {e}\n{tb.getvalue()}")
             self.call_from_thread(self._atualizar_tts, f"Erro: {e}")
         finally:
+            debug.log("_processar finalizando")
             self.call_from_thread(self._voltar_idle)
             self.processando = False
 
