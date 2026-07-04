@@ -117,7 +117,8 @@ def _palpebra(c, cx, cy):
         c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
 
 def _olho_fechado(c, cx, cy):
-    c.draw_line(cx - 6, cy, cx + 6, cy, SOBRANCELHA)
+    _filled_oval(c, cx, cy, 6, 4, PELE)
+    c.draw_line(cx - 7, cy, cx + 7, cy, SOBRANCELHA)
 
 def _sobrancelhas(c, estilo):
     sy = FY - 16
@@ -301,7 +302,7 @@ class LuizaApp(App[None]):
     def _piscar(self):
         self._piscando = True
         self._atualizar_rosto()
-        self.set_timer(0.12, self._abrir_olhos)
+        self.set_timer(0.2, self._abrir_olhos)
 
     def _abrir_olhos(self):
         self._piscando = False
