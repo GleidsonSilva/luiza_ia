@@ -52,7 +52,7 @@ def _olho(c, cx, cy, estilo):
         c.set_pixel(cx + 1, cy - 1, BRANCO)
         c.draw_line(cx - 7, cy + 6, cx + 7, cy + 6, OLHO)
     elif estilo == "focused":
-        _filled_circle(c, cx, cy - 2, 3, OLHO)
+        _filled_circle(c, cx - 1, cy - 2, 3, OLHO)
     elif estilo == "up":
         _filled_circle(c, cx - 1, cy - 3, 3, OLHO)
 
