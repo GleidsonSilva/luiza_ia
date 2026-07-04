@@ -10,7 +10,7 @@ from textual_canvas import Canvas
 from textual.color import Color
 
 W, H = 120, 72
-FX, FY = 60, 46
+FX, FY = 60, 38
 
 PELE = Color(255, 200, 160)
 OLHO = Color(70, 148, 80)
@@ -108,44 +108,44 @@ def _boca(c, cx, cy, forma):
         _boca_retang(c, cx, cy, 7, 7)
 
 def _blush(c):
-    _filled_circle(c, 23, FY + 2, 5, BLUSH)
-    _filled_circle(c, 97, FY + 2, 5, BLUSH)
+    _filled_circle(c, FX - 22, FY + 2, 5, BLUSH)
+    _filled_circle(c, FX + 22, FY + 2, 5, BLUSH)
 
 def _sobrancelhas(c, estilo):
-    sy = FY - 18
+    sy = FY - 16
     if estilo == "neutra":
-        c.draw_line(28, sy, 48, sy, SOBRANCELHA)
-        c.draw_line(72, sy, 92, sy, SOBRANCELHA)
+        c.draw_line(FX - 24, sy, FX - 8, sy, SOBRANCELHA)
+        c.draw_line(FX + 8, sy, FX + 24, sy, SOBRANCELHA)
     elif estilo == "franzida":
-        c.draw_line(26, sy + 2, 46, sy - 2, SOBRANCELHA)
-        c.draw_line(74, sy - 2, 94, sy + 2, SOBRANCELHA)
+        c.draw_line(FX - 26, sy + 2, FX - 10, sy - 2, SOBRANCELHA)
+        c.draw_line(FX + 10, sy - 2, FX + 26, sy + 2, SOBRANCELHA)
     elif estilo == "curiosa":
-        c.draw_line(28, sy - 2, 48, sy + 2, SOBRANCELHA)
-        c.draw_line(72, sy + 2, 92, sy - 2, SOBRANCELHA)
+        c.draw_line(FX - 24, sy - 2, FX - 8, sy + 2, SOBRANCELHA)
+        c.draw_line(FX + 8, sy + 2, FX + 24, sy - 2, SOBRANCELHA)
 
 def _cabelo_atras(c):
-    _filled_oval(c, FX, FY - 28, 68, 36, CABELO)
-    _filled_oval(c, FX - 48, FY - 10, 20, 28, CABELO)
-    _filled_oval(c, FX + 48, FY - 10, 20, 28, CABELO)
+    _filled_oval(c, FX, FY - 18, 50, 16, CABELO)
+    _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
+    _filled_oval(c, FX + 40, FY - 10, 14, 20, CABELO)
 
 def _franja(c):
     for x in range(33, 90, 6):
-        _filled_oval(c, x, FY - 24, 4, 6, CABELO)
+        _filled_oval(c, x, FY - 22, 4, 5, CABELO)
 
 def _lacinho(c):
-    _filled_oval(c, FX - 12, FY - 36, 10, 6, C_LACO)
-    _filled_oval(c, FX + 12, FY - 36, 10, 6, C_LACO)
-    _filled_circle(c, FX, FY - 36, 3, C_LACO_ESCURO)
+    _filled_oval(c, FX - 12, FY - 32, 10, 5, C_LACO)
+    _filled_oval(c, FX + 12, FY - 32, 10, 5, C_LACO)
+    _filled_circle(c, FX, FY - 32, 3, C_LACO_ESCURO)
 
-EYE_L = FX - 22
-EYE_R = FX + 22
+EYE_L = FX - 16
+EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
     _cabelo_atras(c)
-    _filled_oval(c, FX, FY, 40, 25, PELE)
+    _filled_oval(c, FX, FY, 36, 22, PELE)
     _franja(c)
     _lacinho(c)
 
