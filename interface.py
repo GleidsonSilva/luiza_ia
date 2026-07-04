@@ -30,6 +30,8 @@ STAR = Color(255, 255, 200)
 FRAME = Color(160, 100, 70)
 PICTURE = Color(230, 215, 195)
 RUG = Color(210, 160, 180)
+DRESS = Color(180, 180, 240)
+DRESS_CT = Color(120, 100, 180)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
@@ -183,6 +185,17 @@ def _chao(c):
         for x in range(W):
             c.set_pixel(x, y, FLOOR)
 
+def _corpo(c):
+    for x in range(56, 64):
+        for y in range(57, 59):
+            c.set_pixel(x, y, PELE)
+    for y in range(59, H):
+        half = 12 + (y - 59) // 2
+        for x in range(FX - half, FX + half + 1):
+            c.set_pixel(x, y, DRESS)
+    c.draw_line(FX - 13, 59, FX - 20, 71, DRESS_CT)
+    c.draw_line(FX + 13, 59, FX + 20, 71, DRESS_CT)
+
 def _cabelo_atras(c):
     _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
     _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
@@ -209,6 +222,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     _janela(c)
     _lua_estrelas(c)
     _quadro(c)
+    _corpo(c)
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
     _franja(c)
