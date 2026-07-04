@@ -64,9 +64,10 @@ def extrair_temas(texto: str, mem: dict) -> dict:
     return mem
 
 def extrair_jogos(texto: str, mem: dict) -> dict:
-    jogos_conhecidos = ["forca", "adivinhacao", "20 perguntas", "simao diz", "simão diz",
-                        "historia coletiva", "deteive", "palavra secreta", "batalha naval",
-                        "caça ao tesouro", "cabo de guerra"]
+    jogos_conhecidos = ["forca", "adivinhacao", "20 perguntas",
+                        "historia coletiva", "detetive", "palavra secreta",
+                        "cadeia de palavras", "o que sou eu", "verdadeiro ou falso",
+                        "rima comigo", "categorias", "stop", "complete a frase"]
     for j in jogos_conhecidos:
         if j in texto.lower() and j not in mem["historico_jogos"]:
             mem["historico_jogos"].append(j)
