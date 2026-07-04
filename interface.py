@@ -35,7 +35,7 @@ DRESS = Color(180, 180, 240)
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
 STATUS_MAP = {
-    "idle":          "[#888]⬤ Pronta[/]",
+    "idle":          "[#555]⬤ Pronta[/]",
     "ouvindo":       "[#4CAF50]⬤ Ouvindo...[/]",
     "transcrevendo": "[#FFC107]⬤ Entendendo...[/]",
     "pensando":      "[#2196F3]⬤ Pensando...[/]",
@@ -275,7 +275,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
 class LuizaApp(App[None]):
     CSS = """
     Screen {
-        background: #000000;
+        background: #f5e1c8;
     }
 
     #face-wrapper {
@@ -302,7 +302,7 @@ class LuizaApp(App[None]):
 
     .label {
         height: 1;
-        color: #888;
+        color: #555;
         text-style: bold;
         margin: 0 4;
         margin-top: 1;
@@ -326,7 +326,7 @@ class LuizaApp(App[None]):
 
     #hint {
         height: 1;
-        color: #AAA;
+        color: #777;
         text-align: center;
         margin-top: 1;
     }
