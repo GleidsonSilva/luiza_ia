@@ -446,9 +446,12 @@ class LuizaApp(App[None]):
     def _verificar_silencio(self):
         if not self.gravando:
             return
+        recent = assistente.buf[self.recording_idx:]
+        if not recent:
+            return
         chunks = []
         n = 0
-        for chunk in reversed(assistente.buf):
+        for chunk in reversed(recent):
             chunks.append(chunk)
             n += len(chunk)
             if n >= 16000:
@@ -457,7 +460,7 @@ class LuizaApp(App[None]):
             return
         audio = np.concatenate(list(reversed(chunks)))
         rms = np.sqrt(np.mean(audio**2))
-        if rms < 0.03:
+        if rms < 0.01:
             self._silencio_count += 1
             if self._silencio_count >= 6:
                 self._parar_gravacao()

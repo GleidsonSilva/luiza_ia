@@ -150,9 +150,6 @@ def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
     if len(audio) < SR * 0.3:
         return ""
-    rms = np.sqrt(np.mean(audio**2))
-    if rms < 0.03:
-        return ""
     audio = audio * GAIN
     peak = np.max(np.abs(audio))
     if peak > 1.0:
