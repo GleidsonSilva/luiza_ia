@@ -119,7 +119,7 @@ def desenhar_rosto(c, expressao, frame_boca):
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
-        _sobrancelhas(c, "curiosa")
+        _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
         _blush(c)
