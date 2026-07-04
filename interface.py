@@ -323,6 +323,7 @@ class LuizaApp(App[None]):
 
     BINDINGS = [
         ("space", "toggle_recording", "Falar"),
+        ("enter", "toggle_recording"),
         ("escape", "quit", "Sair"),
     ]
 
@@ -335,15 +336,16 @@ class LuizaApp(App[None]):
 
     def action_toggle_recording(self):
         agora = time.monotonic()
-        if agora - self._ultimo_toggle < 0.3:
-            return
-        self._ultimo_toggle = agora
         if self.processando:
             return
-        if self.gravando:
-            self._parar_gravacao()
-        else:
+        if not self.gravando:
+            if agora - self._ultimo_toggle < 0.3:
+                return
+            self._ultimo_toggle = agora
+            self._inicio_gravacao = agora
             self._iniciar_gravacao()
+        elif agora - self._inicio_gravacao >= 2.0:
+            self._parar_gravacao()
 
     expressao = reactive("idle")
     _frame_boca = 0
@@ -356,6 +358,7 @@ class LuizaApp(App[None]):
         self.recording_idx = 0
         self._olho_dir = (0, 0)
         self._silencio_count = 0
+        self._inicio_gravacao = 0.0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -365,7 +368,7 @@ class LuizaApp(App[None]):
         yield Static(" ", id="stt-text", classes="bubble")
         yield Static("Luiza:", classes="label label-luiza")
         yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
-        yield Static("\\[Espaço] Falar  \\[Esc] Sair", id="hint")
+        yield Static("\\[Espaço/Enter] Falar  \\[Esc] Sair", id="hint")
 
     def on_mount(self):
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
