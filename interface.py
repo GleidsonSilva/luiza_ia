@@ -124,7 +124,7 @@ def _sobrancelhas(c, estilo):
         c.draw_line(FX + 8, sy + 2, FX + 24, sy - 2, SOBRANCELHA)
 
 def _cabelo_atras(c):
-    _filled_oval(c, FX, FY - 18, 50, 16, CABELO)
+    _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
     _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
     _filled_oval(c, FX + 40, FY - 10, 14, 20, CABELO)
 
