@@ -17,6 +17,7 @@ OLHO = Color(94, 60, 45)
 BRANCO = Color(255, 255, 255)
 BLUSH = Color(255, 130, 160)
 BOCA_COR = Color(235, 70, 75)
+CABELO = Color(255, 215, 80)
 FUNDO = Color(0, 0, 0)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
@@ -31,15 +32,27 @@ STATUS_MAP = {
 
 def _filled_oval(c, cx, cy, rx, ry, color):
     for dy in range(-ry, ry + 1):
+        y = cy + dy
+        if y < 0 or y >= H:
+            continue
         for dx in range(-rx, rx + 1):
+            x = cx + dx
+            if x < 0 or x >= W:
+                continue
             if (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1:
-                c.set_pixel(cx + dx, cy + dy, color)
+                c.set_pixel(x, y, color)
 
 def _filled_circle(c, cx, cy, r, color):
     for dy in range(-r, r + 1):
+        y = cy + dy
+        if y < 0 or y >= H:
+            continue
         for dx in range(-r, r + 1):
+            x = cx + dx
+            if x < 0 or x >= W:
+                continue
             if dx * dx + dy * dy <= r * r:
-                c.set_pixel(cx + dx, cy + dy, color)
+                c.set_pixel(x, y, color)
 
 def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
     _filled_circle(c, cx, cy, 7, BRANCO)
@@ -103,6 +116,16 @@ def _sobrancelhas(c, estilo):
         c.draw_line(21, sy - 3, 45, sy + 3, OLHO)
         c.draw_line(75, sy + 3, 99, sy - 3, OLHO)
 
+def _cabelo_atras(c):
+    _filled_oval(c, FX, FY - 18, 56, 24, CABELO)
+    _filled_oval(c, FX - 48, FY - 10, 18, 28, CABELO)
+    _filled_oval(c, FX + 48, FY - 10, 18, 28, CABELO)
+
+def _franja(c):
+    for x, y, r in [(36,17,3), (42,15,4), (48,18,3), (54,16,4), (60,19,3),
+                     (66,16,4), (72,18,3), (78,15,4), (84,17,3)]:
+        _filled_circle(c, x, y, r, CABELO)
+
 EYE_L = FX - 27
 EYE_R = FX + 27
 EYE_Y = FY - 12
@@ -110,7 +133,9 @@ MOUTH_Y = FY + 15
 
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
+    _cabelo_atras(c)
     _filled_oval(c, FX, FY, 50, 30, PELE)
+    _franja(c)
 
     if expressao == "idle":
         _sobrancelhas(c, "neutra")
