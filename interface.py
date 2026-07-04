@@ -114,8 +114,10 @@ def _blush(c):
 def _sobrancelhas(c, estilo):
     sy = FY - 16
     if estilo == "neutra":
-        _filled_oval(c, FX - 16, sy, 8, 1, SOBRANCELHA)
-        _filled_oval(c, FX + 16, sy, 8, 1, SOBRANCELHA)
+        for ox in range(-7, 8):
+            oy = (ox * ox) // 12
+            c.set_pixel(FX - 16 + ox, sy - oy, SOBRANCELHA)
+            c.set_pixel(FX + 16 + ox, sy - oy, SOBRANCELHA)
     elif estilo == "franzida":
         c.draw_line(FX - 26, sy + 2, FX - 10, sy - 2, SOBRANCELHA)
         c.draw_line(FX + 10, sy - 2, FX + 26, sy + 2, SOBRANCELHA)
