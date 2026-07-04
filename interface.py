@@ -10,7 +10,7 @@ from textual_canvas import Canvas
 from textual.color import Color
 
 W, H = 120, 72
-FX, FY = 60, 40
+FX, FY = 60, 44
 
 PELE = Color(255, 200, 160)
 OLHO = Color(70, 148, 80)
@@ -19,6 +19,8 @@ BRANCO = Color(255, 255, 255)
 BLUSH = Color(255, 130, 160)
 BOCA_COR = Color(235, 70, 75)
 CABELO = Color(255, 215, 80)
+C_LACO = Color(220, 40, 40)
+C_LACO_ESCURO = Color(160, 20, 20)
 FUNDO = Color(0, 0, 0)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
@@ -122,13 +124,18 @@ def _sobrancelhas(c, estilo):
         c.draw_line(72, sy + 2, 92, sy - 2, SOBRANCELHA)
 
 def _cabelo_atras(c):
-    _filled_oval(c, FX, FY - 18, 56, 30, CABELO)
-    _filled_oval(c, FX - 48, FY - 10, 18, 28, CABELO)
-    _filled_oval(c, FX + 48, FY - 10, 18, 28, CABELO)
+    _filled_oval(c, FX, FY - 18, 68, 36, CABELO)
+    _filled_oval(c, FX - 48, FY - 10, 20, 28, CABELO)
+    _filled_oval(c, FX + 48, FY - 10, 20, 28, CABELO)
 
 def _franja(c):
     for x in range(33, 90, 6):
         _filled_oval(c, x, FY - 24, 4, 6, CABELO)
+
+def _lacinho(c):
+    _filled_oval(c, FX - 12, FY - 36, 10, 6, C_LACO)
+    _filled_oval(c, FX + 12, FY - 36, 10, 6, C_LACO)
+    _filled_circle(c, FX, FY - 36, 3, C_LACO_ESCURO)
 
 EYE_L = FX - 22
 EYE_R = FX + 22
@@ -140,6 +147,7 @@ def desenhar_rosto(c, expressao, frame_boca):
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 40, 25, PELE)
     _franja(c)
+    _lacinho(c)
 
     if expressao == "idle":
         _sobrancelhas(c, "neutra")
