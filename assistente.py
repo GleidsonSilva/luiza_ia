@@ -1,4 +1,4 @@
-import sys, os, json, tempfile, select, time, re
+import sys, os, json, tempfile, select, time, re, threading
 from datetime import datetime
 import numpy as np
 import sounddevice as sd
@@ -11,7 +11,8 @@ import contexto
 
 SR = 16000
 MAX_DURATION = 15
-GAIN = 8.0
+TARGET_PEAK = 0.95
+MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
 MAX_HISTORICO = 5
@@ -148,12 +149,15 @@ def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
 
 def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
+    rms = np.sqrt(np.mean(audio**2)) if len(audio) > 0 else 0
+    print(f"  DBG transcrever: after trim len={len(audio)} rms={rms:.5f}", flush=True)
     if len(audio) < SR * 0.3:
+        print(f"  DBG: too short ({len(audio)} < {SR * 0.3})", flush=True)
         return ""
-    audio = audio * GAIN
     peak = np.max(np.abs(audio))
-    if peak > 1.0:
-        audio = audio / peak * 0.95
+    if peak > 0:
+        gain = min(MAX_GAIN, TARGET_PEAK / peak)
+        audio = audio * gain
 
     tmp = tempfile.mktemp(suffix=".wav")
     sf.write(tmp, audio, SR)
@@ -165,7 +169,9 @@ def transcrever(audio: np.ndarray) -> str:
     )
     os.remove(tmp)
     texto = r["text"].strip()
+    print(f"  DBG whisper raw: '{texto}'", flush=True)
     if not texto or not re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I):
+        print(f"  DBG: vowel check failed", flush=True)
         return ""
     return texto
 
@@ -182,8 +188,11 @@ def perguntar(texto: str) -> str:
 
     resposta = ""
     needs_rerun = False
+    max_iters = 3
+    iters = 0
 
-    while True:
+    while iters < max_iters:
+        iters += 1
         r = requests.post(OLLAMA_URL, json={
             "model": MODEL, "messages": messages, "tools": tools, "stream": False
         }, timeout=30)
@@ -250,13 +259,31 @@ def key_pressed() -> bool:
         return True
     return False
 
-nome_crianca = mem.get("crianca", {}).get("nome", "")
+buf_lock = threading.Lock()
 buf = []
-stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
-                        callback=lambda i, f, t, s: buf.append(i.copy()))
-stream.start()
+stream = None
+nome_crianca = ""
+
+
+def iniciar_stream():
+    global stream, buf, nome_crianca
+    nome_crianca = mem.get("crianca", {}).get("nome", "")
+    buf = []
+    stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
+                            callback=lambda i, f, t, s: buf.append(i.copy()))
+    stream.start()
+
+
+def parar_stream():
+    global stream
+    if stream:
+        stream.stop()
+        stream.close()
+        stream = None
+
 
 if __name__ == "__main__":
+    iniciar_stream()
     if nome_crianca:
         print(f"Ola {nome_crianca}! A Luiza ja esta aqui!")
     else:
@@ -269,7 +296,8 @@ if __name__ == "__main__":
             sys.stdin.readline()
         input("\nPressione ENTER para falar com a Luiza...")
 
-        idx = len(buf)
+        with buf_lock:
+            idx = len(buf)
         print("Falando... (ENTER para parar)", end="", flush=True)
         inicio = time.time()
 
@@ -282,7 +310,8 @@ if __name__ == "__main__":
                 print(" (tempo maximo)")
                 break
 
-        full = np.concatenate(buf[idx:])
+        with buf_lock:
+            full = np.concatenate(buf[idx:])
 
         print("Entendendo...")
         texto = transcrever(full)

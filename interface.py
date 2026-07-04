@@ -330,8 +330,7 @@ class LuizaApp(App[None]):
     _ultimo_toggle: float = 0.0
 
     def action_quit(self):
-        assistente.stream.stop()
-        assistente.stream.close()
+        assistente.parar_stream()
         self.exit()
 
     def action_toggle_recording(self):
@@ -371,6 +370,7 @@ class LuizaApp(App[None]):
         yield Static("\\[Espaço/Enter] Falar  \\[Esc] Sair", id="hint")
 
     def on_mount(self):
+        assistente.iniciar_stream()
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
                                              pause=True)
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
@@ -402,7 +402,6 @@ class LuizaApp(App[None]):
             self._olho_dir = random.choice(self.DIRECOES)
             self._atualizar_rosto()
         self._agendar_olhar()
-        self._agendar_piscar()
 
     def _avancar_boca(self):
         self._frame_boca = (self._frame_boca + 1) % len(MOUTH_CYCLE)
@@ -428,7 +427,8 @@ class LuizaApp(App[None]):
 
     def _iniciar_gravacao(self):
         self.gravando = True
-        self.recording_idx = len(assistente.buf)
+        with assistente.buf_lock:
+            self.recording_idx = len(assistente.buf)
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
@@ -440,16 +440,18 @@ class LuizaApp(App[None]):
         self.gravando = False
         self.processando = True
         self._mudar_expressao("transcrevendo")
-        audio = np.concatenate(assistente.buf[self.recording_idx:])
-        del assistente.buf[:self.recording_idx]
-        self.recording_idx = 0
+        with assistente.buf_lock:
+            audio = np.concatenate(assistente.buf[self.recording_idx:])
+            del assistente.buf[:self.recording_idx]
+            self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),
                          daemon=True).start()
 
     def _verificar_silencio(self):
         if not self.gravando:
             return
-        recent = assistente.buf[self.recording_idx:]
+        with assistente.buf_lock:
+            recent = assistente.buf[self.recording_idx:]
         if not recent:
             return
         chunks = []
@@ -472,7 +474,9 @@ class LuizaApp(App[None]):
 
     def _processar(self, audio):
         try:
+            print(f"  DBG _processar: audio shape={audio.shape}", flush=True)
             texto = assistente.transcrever(audio)
+            print(f"  DBG _processar: texto='{texto}'", flush=True)
             if not texto:
                 self.call_from_thread(self._voltar_idle)
                 return
@@ -480,15 +484,18 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_stt, texto)
             self.call_from_thread(self._mudar_expressao, "pensando")
 
+            print("  DBG: chamando perguntar...", flush=True)
             resposta = assistente.perguntar(texto)
+            print(f"  DBG: resposta='{resposta}'", flush=True)
 
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
 
             assistente.falar(resposta)
-        except Exception:
+        except Exception as e:
             import traceback
             traceback.print_exc()
+            self.call_from_thread(self._atualizar_tts, f"Erro: {e}")
         finally:
             self.call_from_thread(self._voltar_idle)
             self.processando = False

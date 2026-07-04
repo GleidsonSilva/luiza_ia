@@ -1,0 +1,9 @@
+numpy
+sounddevice
+soundfile
+mlx-whisper
+requests
+kokoro-onnx
+textual
+textual-canvas
+ddgs
