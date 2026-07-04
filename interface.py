@@ -22,6 +22,14 @@ CABELO = Color(255, 215, 80)
 C_LACO = Color(220, 40, 40)
 C_LACO_ESCURO = Color(160, 20, 20)
 FUNDO = Color(0, 0, 0)
+WALL = Color(245, 225, 200)
+FLOOR = Color(180, 140, 110)
+WINDOW_GLASS = Color(170, 210, 240)
+MOON = Color(255, 250, 220)
+STAR = Color(255, 255, 200)
+FRAME = Color(160, 100, 70)
+PICTURE = Color(230, 215, 195)
+RUG = Color(210, 160, 180)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
@@ -137,6 +145,44 @@ def _sobrancelhas(c, estilo):
         c.draw_line(FX - 24, sy - 2, FX - 8, sy + 2, SOBRANCELHA)
         c.draw_line(FX + 8, sy + 2, FX + 24, sy - 2, SOBRANCELHA)
 
+def _tapete(c):
+    _filled_oval(c, FX, 67, 30, 4, RUG)
+
+def _janela(c):
+    for y in range(4, 36):
+        for x in range(110, 119):
+            c.set_pixel(x, y, WINDOW_GLASS)
+    c.draw_line(110, 4, 118, 4, FRAME)
+    c.draw_line(110, 4, 110, 35, FRAME)
+    c.draw_line(118, 4, 118, 35, FRAME)
+    c.draw_line(110, 35, 118, 35, FRAME)
+    c.draw_line(114, 4, 114, 35, FRAME)
+    c.draw_line(110, 20, 118, 20, FRAME)
+
+def _lua_estrelas(c):
+    _filled_circle(c, 16, 10, 6, MOON)
+    _filled_circle(c, 13, 8, 5, WALL)
+    for sx, sy in [(30,5), (25,18), (35,12), (8,22), (20,25)]:
+        c.set_pixel(sx, sy, STAR)
+        c.set_pixel(sx + 1, sy + 1, STAR)
+        c.set_pixel(sx - 1, sy + 1, STAR)
+        c.set_pixel(sx, sy + 2, STAR)
+        c.set_pixel(sx + 1, sy - 1, STAR)
+
+def _quadro(c):
+    for y in range(24, 38):
+        for x in range(104, 116):
+            c.set_pixel(x, y, PICTURE)
+    c.draw_line(103, 23, 116, 23, FRAME)
+    c.draw_line(103, 23, 103, 38, FRAME)
+    c.draw_line(116, 23, 116, 38, FRAME)
+    c.draw_line(103, 38, 116, 38, FRAME)
+
+def _chao(c):
+    for y in range(66, H):
+        for x in range(W):
+            c.set_pixel(x, y, FLOOR)
+
 def _cabelo_atras(c):
     _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
     _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
@@ -158,6 +204,11 @@ MOUTH_Y = FY + 12
 
 def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     c.clear()
+    _chao(c)
+    _tapete(c)
+    _janela(c)
+    _lua_estrelas(c)
+    _quadro(c)
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
     _franja(c)
@@ -274,6 +325,9 @@ class LuizaApp(App[None]):
         ("escape", "quit", "Sair"),
     ]
 
+    def action_quit(self):
+        self.exit()
+
     expressao = reactive("idle")
     _frame_boca = 0
     _piscando = False
@@ -286,7 +340,7 @@ class LuizaApp(App[None]):
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
-            yield Canvas(W, H, canvas_color=FUNDO, id="rosto")
+            yield Canvas(W, H, canvas_color=WALL, id="rosto")
         yield Static(STATUS_MAP["idle"], id="status")
         yield Static("Você:", classes="label")
         yield Static("", id="stt-text", classes="bubble")
