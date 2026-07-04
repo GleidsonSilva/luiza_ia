@@ -10,7 +10,7 @@ from textual_canvas import Canvas
 from textual.color import Color
 
 W, H = 80, 50
-FX, FY = 40, 28
+FX, FY = 40, 25
 
 PELE = Color(255, 228, 196)
 OLHO = Color(74, 55, 40)
@@ -88,52 +88,57 @@ def _boca(c, cx, cy, forma):
         _boca_retang(c, cx, cy, 6, 5)
 
 def _blush(c):
-    _filled_circle(c, 14, 30, 4, BLUSH)
-    _filled_circle(c, 66, 30, 4, BLUSH)
+    _filled_circle(c, 14, FY + 2, 4, BLUSH)
+    _filled_circle(c, 66, FY + 2, 4, BLUSH)
 
 def _sobrancelhas(c, estilo):
+    sy = FY - 15
     if estilo == "neutra":
-        c.draw_line(16, 12, 30, 12, OLHO)
-        c.draw_line(50, 12, 64, 12, OLHO)
+        c.draw_line(16, sy, 30, sy, OLHO)
+        c.draw_line(50, sy, 64, sy, OLHO)
     elif estilo == "franzida":
-        c.draw_line(14, 14, 28, 10, OLHO)
-        c.draw_line(52, 10, 66, 14, OLHO)
+        c.draw_line(14, sy + 2, 28, sy - 2, OLHO)
+        c.draw_line(52, sy - 2, 66, sy + 2, OLHO)
     elif estilo == "curiosa":
-        c.draw_line(16, 10, 28, 14, OLHO)
-        c.draw_line(52, 14, 64, 10, OLHO)
+        c.draw_line(16, sy - 2, 28, sy + 2, OLHO)
+        c.draw_line(52, sy + 2, 64, sy - 2, OLHO)
+
+EYE_Y = FY - 8
+BLUSH_Y = FY + 2
+MOUTH_Y = FY + 10
 
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
-    _filled_oval(c, FX, FY, 32, 24, PELE)
+    _filled_oval(c, FX, FY, 30, 20, PELE)
 
     if expressao == "idle":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, 20, "normal")
-        _olho(c, 56, 20, "normal")
+        _olho(c, 24, EYE_Y, "normal")
+        _olho(c, 56, EYE_Y, "normal")
         _blush(c)
-        _boca(c, FX, 38, "smile")
+        _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
         _sobrancelhas(c, "curiosa")
-        _olho(c, 24, 20, "normal")
-        _olho(c, 56, 20, "normal")
+        _olho(c, 24, EYE_Y, "normal")
+        _olho(c, 56, EYE_Y, "normal")
         _blush(c)
-        _boca(c, FX, 38, "smile")
+        _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "franzida")
-        _olho(c, 24, 20, "focused")
-        _olho(c, 56, 20, "focused")
-        _boca(c, FX, 38, "thinking")
+        _olho(c, 24, EYE_Y, "focused")
+        _olho(c, 56, EYE_Y, "focused")
+        _boca(c, FX, MOUTH_Y, "thinking")
     elif expressao == "pensando":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, 18, "up")
-        _olho(c, 56, 18, "up")
-        _boca(c, FX, 38, "surprised")
+        _olho(c, 24, EYE_Y - 2, "up")
+        _olho(c, 56, EYE_Y - 2, "up")
+        _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, 20, "happy")
-        _olho(c, 56, 20, "happy")
+        _olho(c, 24, EYE_Y, "happy")
+        _olho(c, 56, EYE_Y, "happy")
         _blush(c)
-        _boca(c, FX, 38, MOUTH_CYCLE[frame_boca])
+        _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
 
 
 class LuizaApp(App[None]):
