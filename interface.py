@@ -298,8 +298,8 @@ class LuizaApp(App[None]):
     }
 
     .bubble {
-        background: #FFFFFF;
-        border: solid #CCC;
+        background: #f8f0e5;
+        border: solid #ddd;
         padding: 0 2;
         height: 3;
         margin: 0 4;
