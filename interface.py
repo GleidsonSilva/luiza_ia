@@ -302,9 +302,11 @@ class LuizaApp(App[None]):
         self._piscando = True
         self._atualizar_rosto()
         self.set_timer(0.12, self._abrir_olhos)
-        self._agendar_piscar()
+
+    def _abrir_olhos(self):
         self._piscando = False
         self._atualizar_rosto()
+        self._agendar_piscar()
 
     def _avancar_boca(self):
         self._frame_boca = (self._frame_boca + 1) % len(MOUTH_CYCLE)
