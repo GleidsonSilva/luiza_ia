@@ -23,7 +23,6 @@ C_LACO = Color(220, 40, 40)
 C_LACO_ESCURO = Color(160, 20, 20)
 FUNDO = Color(0, 0, 0)
 WALL = Color(245, 225, 200)
-FLOOR = Color(180, 140, 110)
 WINDOW_GLASS = Color(170, 210, 240)
 MOON = Color(255, 250, 220)
 STAR = Color(255, 255, 200)
@@ -180,11 +179,6 @@ def _lua_estrelas(c):
         c.set_pixel(sx + 1, sy - 1, STAR)
 
  
-def _chao(c):
-    for y in range(66, H):
-        for x in range(W):
-            c.set_pixel(x, y, FLOOR)
-
 def _corpo(c):
     for x in range(56, 64):
         for y in range(57, 59):
@@ -215,7 +209,6 @@ MOUTH_Y = FY + 12
 
 def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     c.clear()
-    _chao(c)
     _tapete(c)
     _janela(c)
     _quadro_janela(c)
