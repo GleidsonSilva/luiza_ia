@@ -1,4 +1,4 @@
-import threading, random, time
+import threading, random, time, re
 import numpy as np
 import assistente
 import debug
@@ -31,8 +31,9 @@ FRAME = Color(160, 100, 70)
 RUG = Color(210, 160, 180)
 DRESS = Color(180, 180, 240)
 
-MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
-               "open_medium", "open_small", "slight"]
+MOUTH_CYCLE = ["smile", "slight", "slight", "open_small", "open_small",
+               "open_medium", "open_large", "open_medium", "open_small",
+               "open_small", "slight", "slight"]
 STATUS_MAP = {
     "idle":          "[#555]⬤ Pronta[/]",
     "ouvindo":       "[#4CAF50]⬤ Ouvindo...[/]",
@@ -224,7 +225,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
-    elif expressao == "transcrevendo":
+    elif expressao == "pensando":
         _sobrancelhas(c, "franzida")
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
         _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy)
@@ -233,12 +234,13 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
-    elif expressao == "pensando":
+    elif expressao == "transcrevendo":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y - 3, "up")
         _olho(c, EYE_R, EYE_Y - 3, "up")
         _palpebra(c, EYE_L, EYE_Y - 3)
         _palpebra(c, EYE_R, EYE_Y - 3)
+        _blush(c)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "neutra")
@@ -301,6 +303,7 @@ class LuizaApp(App[None]):
     .bubble {
         background: #fcf0e0;
         border: solid #d0c0a8;
+        color: #4a3f35;
         padding: 0 2;
         height: 3;
         margin: 0 4;
@@ -359,6 +362,7 @@ class LuizaApp(App[None]):
         self._olho_dir = (0, 0)
         self._silencio_count = 0
         self._inicio_gravacao = 0.0
+        self._boca_delay_timer = None
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -372,7 +376,7 @@ class LuizaApp(App[None]):
 
     def on_mount(self):
         assistente.iniciar_stream()
-        self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
+        self._boca_timer = self.set_interval(1 / 18, self._avancar_boca,
                                              pause=True)
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
                                                   pause=True)
@@ -416,15 +420,22 @@ class LuizaApp(App[None]):
                            self._piscando, self._olho_dir)
 
     def _mudar_expressao(self, expressao):
+        if self._boca_delay_timer:
+            self._boca_delay_timer.cancel()
+            self._boca_delay_timer = None
         self.expressao = expressao
         self._frame_boca = 0
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
         status.update(STATUS_MAP.get(expressao, ""))
         if expressao == "falando":
-            self._boca_timer.resume()
+            self._boca_delay_timer = self.set_timer(0.5, self._iniciar_animacao_boca)
         else:
             self._boca_timer.pause()
+
+    def _iniciar_animacao_boca(self):
+        self._boca_delay_timer = None
+        self._boca_timer.resume()
 
     def _iniciar_gravacao(self):
         self.gravando = True
@@ -507,9 +518,13 @@ class LuizaApp(App[None]):
             self.processando = False
 
     def _atualizar_stt(self, texto):
+        if texto:
+            texto = re.sub(r'\s+', ' ', texto).strip()
         self.query_one("#stt-text", Static).update(texto)
 
     def _atualizar_tts(self, texto):
+        if texto:
+            texto = re.sub(r'\s+', ' ', texto).strip()
         self.query_one("#tts-text", Static).update(texto)
 
     def _voltar_idle(self):

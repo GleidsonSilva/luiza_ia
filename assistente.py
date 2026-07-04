@@ -146,6 +146,7 @@ tools = [
 ]
 
 mem = memoria.carregar()
+_identidade_confirmada = False
 historico = []
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -184,11 +185,12 @@ def transcrever(audio: np.ndarray) -> str:
     return texto
 
 def perguntar(texto: str) -> str:
-    global historico
+    global historico, _identidade_confirmada
     system = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
-    memorias = memoria.formatar_para_prompt(mem)
-    if memorias:
-        system += f"\n\n### SOBRE SEU AMIGO\n{memorias}"
+    if _identidade_confirmada:
+        memorias = memoria.formatar_para_prompt(mem)
+        if memorias:
+            system += f"\n\n### IDENTIDADE\n{memorias}"
 
     messages = [{"role": "system", "content": system}]
     messages.extend(historico)
@@ -225,6 +227,7 @@ def perguntar(texto: str) -> str:
 
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
+                _identidade_confirmada = True
                 memoria.adicionar_fato(mem, "nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
@@ -284,7 +287,8 @@ nome_crianca = ""
 
 
 def iniciar_stream():
-    global stream, buf, nome_crianca
+    global stream, buf, nome_crianca, _identidade_confirmada
+    _identidade_confirmada = False
     nome_crianca = mem.get("crianca", {}).get("nome", "")
     buf = []
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
