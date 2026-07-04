@@ -39,7 +39,7 @@ def formatar_para_prompt(mem: dict) -> str:
 def extrair_fatos(texto: str, mem: dict) -> dict:
     c = mem["crianca"]
     padroes = [
-        (r"(?:meu nome eh|me chamo|eu sou o?)\s*(\w+)", "nome"),
+        (r"(?:meu nome eh|me chamo|eu sou o?)\s*([^\s.!?,]+(?:\s[^\s.!?,]+)?)", "nome"),
         (r"(\d+)\s*anos", "idade"),
         (r"(?:gosto|amo|adoro)\s+(?:da?\s+)?cor\s+(\w+)", "cor_favorita"),
         (r"(?:tenho um?|meu bichinho|meu pet|meu cachorro|meu gato)\s*(?:chamado\s+)?(\w+)", "bichinho"),

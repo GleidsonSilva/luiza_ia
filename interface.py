@@ -375,6 +375,7 @@ class LuizaApp(App[None]):
         yield Static("\\[Espaço/Enter] Falar  \\[Esc] Sair", id="hint")
 
     def on_mount(self):
+        assistente._identidade_confirmada = False
         assistente.iniciar_stream()
         self._boca_timer = self.set_interval(1 / 18, self._avancar_boca,
                                              pause=True)

@@ -291,8 +291,7 @@ nome_crianca = ""
 
 
 def iniciar_stream():
-    global stream, buf, nome_crianca, _identidade_confirmada
-    _identidade_confirmada = False
+    global stream, buf, nome_crianca
     nome_crianca = mem.get("crianca", {}).get("nome", "")
     buf = []
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
@@ -309,6 +308,7 @@ def parar_stream():
 
 
 if __name__ == "__main__":
+    _identidade_confirmada = False
     iniciar_stream()
     if nome_crianca:
         print(f"Ola {nome_crianca}! A Luiza ja esta aqui!")
