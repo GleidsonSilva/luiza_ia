@@ -298,15 +298,15 @@ class LuizaApp(App[None]):
     }
 
     .bubble {
-        background: #efe0cc;
-        border: solid #ddd;
+        background: #fcf0e0;
+        border: solid #d0c0a8;
         padding: 0 2;
         height: 3;
         margin: 0 4;
     }
 
     #stt-text, #tts-text {
-        background: #efe0cc !important;
+        background: #fcf0e0 !important;
     }
 
     .bubble-luiza {
@@ -344,9 +344,9 @@ class LuizaApp(App[None]):
             yield Canvas(W, H, canvas_color=WALL, id="rosto")
         yield Static(STATUS_MAP["idle"], id="status")
         yield Static("Você:", classes="label")
-        yield Static("", id="stt-text", classes="bubble")
+        yield Static(" ", id="stt-text", classes="bubble")
         yield Static("Luiza:", classes="label label-luiza")
-        yield Static("", id="tts-text", classes="bubble bubble-luiza")
+        yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
         yield Static("[Espaço] Falar  [Esc] Sair", id="hint")
 
     def on_mount(self):
