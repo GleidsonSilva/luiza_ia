@@ -298,7 +298,7 @@ class LuizaApp(App[None]):
     }
 
     .bubble {
-        background: #faf0e4;
+        background: #efe0cc;
         border: solid #ddd;
         padding: 0 2;
         height: 3;
@@ -306,7 +306,7 @@ class LuizaApp(App[None]):
     }
 
     #stt-text, #tts-text {
-        background: #faf0e4 !important;
+        background: #efe0cc !important;
     }
 
     .bubble-luiza {
