@@ -111,14 +111,15 @@ def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 5, BLUSH)
     _filled_circle(c, FX + 22, FY + 2, 5, BLUSH)
 
-def _palpebra_cilios(c, cx, cy):
+def _palpebra(c, cx, cy):
     for ox in range(-6, 7):
         oy = (ox * ox) // 7
         c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
-    c.draw_line(cx - 5, cy - 4, cx - 6, cy - 6, SOBRANCELHA)
-    c.draw_line(cx - 2, cy - 6, cx - 2, cy - 8, SOBRANCELHA)
-    c.draw_line(cx + 2, cy - 6, cx + 2, cy - 8, SOBRANCELHA)
-    c.draw_line(cx + 5, cy - 4, cx + 6, cy - 6, SOBRANCELHA)
+
+def _olho_fechado(c, cx, cy):
+    for ox in range(-6, 7):
+        oy = (ox * ox) // 18
+        c.set_pixel(cx + ox, cy - 1 + oy, SOBRANCELHA)
 
 def _sobrancelhas(c, estilo):
     sy = FY - 16
@@ -153,7 +154,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca):
+def desenhar_rosto(c, expressao, frame_boca, piscando=False):
     c.clear()
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
@@ -164,16 +165,16 @@ def desenhar_rosto(c, expressao, frame_boca):
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
-        _palpebra_cilios(c, EYE_L, EYE_Y)
-        _palpebra_cilios(c, EYE_R, EYE_Y)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
-        _palpebra_cilios(c, EYE_L, EYE_Y)
-        _palpebra_cilios(c, EYE_R, EYE_Y)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
@@ -181,25 +182,29 @@ def desenhar_rosto(c, expressao, frame_boca):
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
         _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy)
         _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy)
-        _palpebra_cilios(c, EYE_L, EYE_Y)
-        _palpebra_cilios(c, EYE_R, EYE_Y)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "pensando":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y - 3, "up")
         _olho(c, EYE_R, EYE_Y - 3, "up")
-        _palpebra_cilios(c, EYE_L, EYE_Y - 3)
-        _palpebra_cilios(c, EYE_R, EYE_Y - 3)
+        _palpebra(c, EYE_L, EYE_Y - 3)
+        _palpebra(c, EYE_R, EYE_Y - 3)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "happy")
         _olho(c, EYE_R, EYE_Y, "happy")
-        _palpebra_cilios(c, EYE_L, EYE_Y)
-        _palpebra_cilios(c, EYE_R, EYE_Y)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
+
+    if piscando:
+        _olho_fechado(c, EYE_L, EYE_Y - 1)
+        _olho_fechado(c, EYE_R, EYE_Y - 1)
 
 
 class LuizaApp(App[None]):
@@ -269,6 +274,7 @@ class LuizaApp(App[None]):
 
     expressao = reactive("idle")
     _frame_boca = 0
+    _piscando = False
 
     def __init__(self):
         super().__init__()
@@ -288,6 +294,16 @@ class LuizaApp(App[None]):
     def on_mount(self):
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
                                              pause=True)
+        self._blink_timer = self.set_interval(5.0, self._piscar)
+        self._atualizar_rosto()
+
+    def _piscar(self):
+        self._piscando = True
+        self._atualizar_rosto()
+        self.set_timer(0.12, self._abrir_olhos)
+
+    def _abrir_olhos(self):
+        self._piscando = False
         self._atualizar_rosto()
 
     def _avancar_boca(self):
@@ -298,7 +314,8 @@ class LuizaApp(App[None]):
     def _atualizar_rosto(self):
         canvas = self.query_one("#rosto", Canvas)
         with canvas.batch_refresh():
-            desenhar_rosto(canvas, self.expressao, self._frame_boca)
+            desenhar_rosto(canvas, self.expressao, self._frame_boca,
+                           self._piscando)
 
     def _mudar_expressao(self, expressao):
         self.expressao = expressao
