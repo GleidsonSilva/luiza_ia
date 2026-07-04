@@ -317,7 +317,7 @@ class LuizaApp(App[None]):
                 (-2,-1), (2,-1), (-2,1), (2,1)]
 
     def _agendar_olhar(self):
-        self.set_timer(random.uniform(5, 15), self._olhar_aleatorio)
+        self.set_timer(random.uniform(3, 9), self._olhar_aleatorio)
 
     def _olhar_aleatorio(self):
         if self.expressao == "idle":
