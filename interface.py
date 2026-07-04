@@ -466,9 +466,10 @@ class LuizaApp(App[None]):
             return
         audio = np.concatenate(list(reversed(chunks)))
         rms = np.sqrt(np.mean(audio**2))
-        if rms < 0.01:
+        if rms < 0.008:
             self._silencio_count += 1
-            if self._silencio_count >= 6:
+            if self._silencio_count >= 10:
+                debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                 self._parar_gravacao()
         else:
             self._silencio_count = 0
