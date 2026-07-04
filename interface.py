@@ -123,7 +123,7 @@ def desenhar_rosto(c, expressao, frame_boca):
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
         _blush(c)
-        _boca(c, FX, MOUTH_Y, "smile")
+        _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "franzida")
         _olho(c, EYE_L, EYE_Y, "focused")
