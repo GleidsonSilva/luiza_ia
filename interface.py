@@ -9,15 +9,15 @@ from textual.containers import Container, Horizontal
 from textual_canvas import Canvas
 from textual.color import Color
 
-W, H = 80, 50
-FX, FY = 40, 25
+W, H = 120, 72
+FX, FY = 60, 36
 
-PELE = Color(255, 228, 196)
-OLHO = Color(74, 55, 40)
+PELE = Color(255, 200, 160)
+OLHO = Color(94, 60, 45)
 BRANCO = Color(255, 255, 255)
-BLUSH = Color(255, 182, 193)
-BOCA_COR = Color(212, 114, 106)
-FUNDO = Color(255, 248, 240)
+BLUSH = Color(255, 130, 160)
+BOCA_COR = Color(235, 70, 75)
+FUNDO = Color(255, 240, 230)
 
 MOUTH_CYCLE = ["smile", "slight", "open_small", "open_medium", "open_large",
                "open_medium", "open_small", "slight"]
@@ -42,19 +42,19 @@ def _filled_circle(c, cx, cy, r, color):
                 c.set_pixel(cx + dx, cy + dy, color)
 
 def _olho(c, cx, cy, estilo):
-    _filled_circle(c, cx, cy, 5, BRANCO)
-    c.draw_circle(cx, cy, 5, OLHO)
+    _filled_circle(c, cx, cy, 7, BRANCO)
+    c.draw_circle(cx, cy, 7, OLHO)
     if estilo == "normal":
-        _filled_circle(c, cx, cy, 3, OLHO)
+        _filled_circle(c, cx, cy, 4, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
     elif estilo == "happy":
-        _filled_circle(c, cx, cy, 3, OLHO)
+        _filled_circle(c, cx, cy, 4, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.draw_line(cx - 5, cy + 4, cx + 5, cy + 4, OLHO)
+        c.draw_line(cx - 7, cy + 6, cx + 7, cy + 6, OLHO)
     elif estilo == "focused":
-        _filled_circle(c, cx, cy, 2, OLHO)
+        _filled_circle(c, cx, cy, 3, OLHO)
     elif estilo == "up":
-        _filled_circle(c, cx - 1, cy - 2, 2, OLHO)
+        _filled_circle(c, cx - 1, cy - 3, 3, OLHO)
 
 def _boca_curva(c, cx, cy, abertura, largura):
     for dx in range(-largura, largura + 1):
@@ -68,75 +68,76 @@ def _boca_retang(c, cx, cy, w, h):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 5, 9)
+        _boca_curva(c, cx, cy, 8, 15)
     elif forma == "slight":
-        _boca_curva(c, cx, cy, 3, 7)
+        _boca_curva(c, cx, cy, 5, 12)
     elif forma == "open_small":
-        _boca_retang(c, cx, cy, 3, 3)
-    elif forma == "open_medium":
         _boca_retang(c, cx, cy, 4, 4)
+    elif forma == "open_medium":
+        _boca_retang(c, cx, cy, 6, 6)
     elif forma == "open_large":
-        _boca_retang(c, cx, cy, 5, 5)
+        _boca_retang(c, cx, cy, 8, 7)
     elif forma == "thinking":
-        for dx in range(-5, 6):
+        for dx in range(-8, 9):
             c.set_pixel(cx + dx, cy, BOCA_COR)
-        c.set_pixel(cx - 5, cy + 1, BOCA_COR)
-        c.set_pixel(cx + 5, cy + 1, BOCA_COR)
+        c.set_pixel(cx - 8, cy + 1, BOCA_COR)
+        c.set_pixel(cx + 8, cy + 1, BOCA_COR)
     elif forma == "surprised":
-        _filled_circle(c, cx, cy, 3, BOCA_COR)
+        _filled_circle(c, cx, cy, 5, BOCA_COR)
     elif forma == "open_wide":
-        _boca_retang(c, cx, cy, 6, 5)
+        _boca_retang(c, cx, cy, 9, 8)
 
 def _blush(c):
-    _filled_circle(c, 14, FY + 2, 4, BLUSH)
-    _filled_circle(c, 66, FY + 2, 4, BLUSH)
+    _filled_circle(c, 17, FY + 3, 6, BLUSH)
+    _filled_circle(c, 103, FY + 3, 6, BLUSH)
 
 def _sobrancelhas(c, estilo):
-    sy = FY - 15
+    sy = FY - 22
     if estilo == "neutra":
-        c.draw_line(16, sy, 30, sy, OLHO)
-        c.draw_line(50, sy, 64, sy, OLHO)
+        c.draw_line(21, sy, 45, sy, OLHO)
+        c.draw_line(75, sy, 99, sy, OLHO)
     elif estilo == "franzida":
-        c.draw_line(14, sy + 2, 28, sy - 2, OLHO)
-        c.draw_line(52, sy - 2, 66, sy + 2, OLHO)
+        c.draw_line(18, sy + 3, 42, sy - 3, OLHO)
+        c.draw_line(78, sy - 3, 102, sy + 3, OLHO)
     elif estilo == "curiosa":
-        c.draw_line(16, sy - 2, 28, sy + 2, OLHO)
-        c.draw_line(52, sy + 2, 64, sy - 2, OLHO)
+        c.draw_line(21, sy - 3, 45, sy + 3, OLHO)
+        c.draw_line(75, sy + 3, 99, sy - 3, OLHO)
 
-EYE_Y = FY - 8
-BLUSH_Y = FY + 2
-MOUTH_Y = FY + 10
+EYE_L = FX - 27
+EYE_R = FX + 27
+EYE_Y = FY - 12
+MOUTH_Y = FY + 15
 
 def desenhar_rosto(c, expressao, frame_boca):
     c.clear()
-    _filled_oval(c, FX, FY, 30, 20, PELE)
+    _filled_oval(c, FX, FY, 50, 30, PELE)
 
     if expressao == "idle":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, EYE_Y, "normal")
-        _olho(c, 56, EYE_Y, "normal")
+        _olho(c, EYE_L, EYE_Y, "normal")
+        _olho(c, EYE_R, EYE_Y, "normal")
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
         _sobrancelhas(c, "curiosa")
-        _olho(c, 24, EYE_Y, "normal")
-        _olho(c, 56, EYE_Y, "normal")
+        _olho(c, EYE_L, EYE_Y, "normal")
+        _olho(c, EYE_R, EYE_Y, "normal")
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "franzida")
-        _olho(c, 24, EYE_Y, "focused")
-        _olho(c, 56, EYE_Y, "focused")
+        _olho(c, EYE_L, EYE_Y, "focused")
+        _olho(c, EYE_R, EYE_Y, "focused")
         _boca(c, FX, MOUTH_Y, "thinking")
     elif expressao == "pensando":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, EYE_Y - 2, "up")
-        _olho(c, 56, EYE_Y - 2, "up")
+        _olho(c, EYE_L, EYE_Y - 3, "up")
+        _olho(c, EYE_R, EYE_Y - 3, "up")
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "neutra")
-        _olho(c, 24, EYE_Y, "happy")
-        _olho(c, 56, EYE_Y, "happy")
+        _olho(c, EYE_L, EYE_Y, "happy")
+        _olho(c, EYE_R, EYE_Y, "happy")
         _blush(c)
         _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
 
@@ -144,18 +145,18 @@ def desenhar_rosto(c, expressao, frame_boca):
 class LuizaApp(App[None]):
     CSS = """
     Screen {
-        background: #FFF8F0;
+        background: #FFF0E6;
     }
 
     #face-wrapper {
-        height: 27;
+        height: 38;
         align: center middle;
     }
 
     Canvas {
-        background: #FFF8F0;
-        width: 80;
-        height: 27;
+        background: #FFF0E6;
+        width: 120;
+        height: 38;
     }
 
     #status {
