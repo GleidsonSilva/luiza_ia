@@ -1,4 +1,6 @@
 import sys, os, json, tempfile, select, time, re, threading
+
+os.environ["TQDM_DISABLE"] = "1"
 from datetime import datetime
 import numpy as np
 import sounddevice as sd
