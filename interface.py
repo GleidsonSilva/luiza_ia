@@ -127,7 +127,7 @@ def _palpebra(c, cx, cy):
         c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
 
 def _olho_fechado(c, cx, cy):
-    _filled_oval(c, cx, cy, 6, 4, PELE)
+    _filled_circle(c, cx, cy, 7, PELE)
     c.draw_line(cx - 7, cy, cx + 7, cy, SOBRANCELHA)
 
 def _sobrancelhas(c, estilo):
