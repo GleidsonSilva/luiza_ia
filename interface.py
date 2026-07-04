@@ -10,7 +10,7 @@ from textual_canvas import Canvas
 from textual.color import Color
 
 W, H = 120, 72
-FX, FY = 60, 38
+FX, FY = 60, 43
 
 PELE = Color(255, 200, 160)
 OLHO = Color(70, 148, 80)
