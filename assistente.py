@@ -1,5 +1,6 @@
 import sys, os, tempfile, select, time
 import numpy as np
+from scipy import signal
 import sounddevice as sd
 import soundfile as sf
 import mlx_whisper
@@ -56,6 +57,15 @@ detetive, palavra secreta
 
 mem = memoria.carregar()
 historico = []
+
+PITCH_SHIFT = 3.5  # semitons (positivo = mais agudo, infantil)
+
+def pitch_shift(audio: np.ndarray, sr: int, semitones: float) -> np.ndarray:
+    factor = 2.0 ** (semitones / 12.0)
+    n = max(1, int(len(audio) / factor))
+    shifted = signal.resample(audio, n)
+    result = signal.resample(shifted, len(audio))
+    return result.astype(audio.dtype)
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     mask = np.abs(audio) > threshold
@@ -116,6 +126,7 @@ def perguntar(texto: str) -> str:
 
 def falar(texto: str):
     samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")
+    samples = pitch_shift(samples, sr, PITCH_SHIFT)
     sd.play(samples, sr)
     sd.wait()
 
