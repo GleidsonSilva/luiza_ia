@@ -111,6 +111,15 @@ def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 5, BLUSH)
     _filled_circle(c, FX + 22, FY + 2, 5, BLUSH)
 
+def _palpebra_cilios(c, cx, cy):
+    for ox in range(-6, 7):
+        oy = (ox * ox) // 7
+        c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
+    c.draw_line(cx - 5, cy - 4, cx - 6, cy - 8, SOBRANCELHA)
+    c.draw_line(cx - 2, cy - 6, cx - 2, cy - 10, SOBRANCELHA)
+    c.draw_line(cx + 2, cy - 6, cx + 2, cy - 10, SOBRANCELHA)
+    c.draw_line(cx + 5, cy - 4, cx + 6, cy - 8, SOBRANCELHA)
+
 def _sobrancelhas(c, estilo):
     sy = FY - 16
     if estilo == "neutra":
@@ -155,12 +164,16 @@ def desenhar_rosto(c, expressao, frame_boca):
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
+        _palpebra_cilios(c, EYE_L, EYE_Y)
+        _palpebra_cilios(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "normal")
         _olho(c, EYE_R, EYE_Y, "normal")
+        _palpebra_cilios(c, EYE_L, EYE_Y)
+        _palpebra_cilios(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
@@ -168,17 +181,23 @@ def desenhar_rosto(c, expressao, frame_boca):
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
         _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy)
         _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy)
+        _palpebra_cilios(c, EYE_L, EYE_Y)
+        _palpebra_cilios(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "pensando":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y - 3, "up")
         _olho(c, EYE_R, EYE_Y - 3, "up")
+        _palpebra_cilios(c, EYE_L, EYE_Y - 3)
+        _palpebra_cilios(c, EYE_R, EYE_Y - 3)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "neutra")
         _olho(c, EYE_L, EYE_Y, "happy")
         _olho(c, EYE_R, EYE_Y, "happy")
+        _palpebra_cilios(c, EYE_L, EYE_Y)
+        _palpebra_cilios(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
 
