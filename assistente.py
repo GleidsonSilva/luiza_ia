@@ -1,4 +1,5 @@
 import sys, os, json, tempfile, select, time
+from datetime import datetime
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
@@ -6,6 +7,7 @@ import mlx_whisper
 import requests
 from kokoro_onnx import Kokoro
 import memoria
+import contexto
 
 SR = 16000
 MAX_DURATION = 15
@@ -44,7 +46,14 @@ detetive, palavra secreta
 ### MEMORIA
 - Quando a crianca disser o nome dela, use a funcao lembrar_nome
 - Quando ela contar algo sobre ela (idade, cor favorita, bichinho, etc), use a funcao lembrar_fato
-- Nao pergunte explicitamente - apenas salve quando ela falar naturalmente"""
+- Nao pergunte explicitamente - apenas salve quando ela falar naturalmente
+
+### CONTEXTO
+- Data, hora e periodo do dia sao informados automaticamente pra voce
+- Se a crianca perguntar sobre o clima, veja se voce sabe a cidade dela
+- Se souber a cidade, use a funcao buscar_clima
+- Se nao souber, pergunte primeiro onde ela mora
+- Se ela perguntar algo que voce nao sabe, use a funcao buscar_web"""
 
 tools = [
     {
@@ -74,7 +83,7 @@ tools = [
                 "properties": {
                     "chave": {
                         "type": "string",
-                        "description": "ex: idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita"
+                        "description": "ex: idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita, cidade, nome_escola, nome_melhor_amigo"
                     },
                     "valor": {
                         "type": "string",
@@ -82,6 +91,40 @@ tools = [
                     }
                 },
                 "required": ["chave", "valor"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_clima",
+            "description": "Busca o clima atual de uma cidade",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cidade": {
+                        "type": "string",
+                        "description": "Nome da cidade para buscar o clima"
+                    }
+                },
+                "required": ["cidade"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_web",
+            "description": "Pesquisa algo na internet que voce nao sabe responder",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "consulta": {
+                        "type": "string",
+                        "description": "O que pesquisar na internet"
+                    }
+                },
+                "required": ["consulta"]
             }
         }
     }
@@ -119,53 +162,69 @@ def transcrever(audio: np.ndarray) -> str:
 
 def perguntar(texto: str) -> str:
     global historico
+    system = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
     memorias = memoria.formatar_para_prompt(mem)
-    system = SYSTEM_PROMPT
     if memorias:
-        system += f"\n\nCoisas que voce sabe sobre seu amigo:\n{memorias}"
+        system += f"\n\n### SOBRE SEU AMIGO\n{memorias}"
 
     messages = [{"role": "system", "content": system}]
     messages.extend(historico)
     messages.append({"role": "user", "content": texto})
 
-    payload = {
-        "model": MODEL,
-        "messages": messages,
-        "tools": tools,
-        "stream": False
-    }
-    r = requests.post(OLLAMA_URL, json=payload)
-    body = r.json()
-    msg = body["message"]
-    resposta = msg.get("content", "").strip()
-    tool_calls = msg.get("tool_calls")
+    resposta = ""
+    needs_rerun = False
 
-    tool_used = False
-    if tool_calls:
+    while True:
+        r = requests.post(OLLAMA_URL, json={
+            "model": MODEL, "messages": messages, "tools": tools, "stream": False
+        })
+        body = r.json()
+        msg = body["message"]
+        if msg.get("content"):
+            resposta = msg["content"].strip()
+        tool_calls = msg.get("tool_calls")
+
+        if not tool_calls:
+            break
+
+        messages.append(msg)
+        needs_rerun = False
+
         for tc in tool_calls:
             fn = tc["function"]
             name = fn["name"]
             args = fn.get("arguments", {})
             if isinstance(args, str):
                 args = json.loads(args)
+
+            result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 memoria.adicionar_fato(mem, "nome", args["nome"])
-                tool_used = True
+                result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
-                tool_used = True
+                result = f"{args['chave']} salvo: {args['valor']}"
+            elif name == "buscar_clima" and args.get("cidade"):
+                result = contexto.buscar_clima(args["cidade"])
+                needs_rerun = True
+            elif name == "buscar_web" and args.get("consulta"):
+                result = contexto.buscar_web(args["consulta"])
+                needs_rerun = True
+            else:
+                result = "Nao foi possivel executar."
 
-    if not tool_used:
-        memoria.extrair_fatos(texto + " " + resposta, mem)
+            messages.append({"role": "tool", "content": result, "name": name})
+
+        if not needs_rerun:
+            break
+
+    memoria.extrair_fatos(texto + " " + resposta, mem)
     memoria.extrair_temas(texto + " " + resposta, mem)
     memoria.extrair_jogos(texto + " " + resposta, mem)
     memoria.salvar(mem)
 
-    hist_entry = {"role": "assistant", "content": resposta}
-    if tool_calls:
-        hist_entry["tool_calls"] = tool_calls
     historico.append({"role": "user", "content": texto})
-    historico.append(hist_entry)
+    historico.append({"role": "assistant", "content": resposta})
     if len(historico) > MAX_HISTORICO * 2:
         historico = historico[-(MAX_HISTORICO * 2):]
 
