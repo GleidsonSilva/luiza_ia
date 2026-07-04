@@ -115,10 +115,10 @@ def _palpebra_cilios(c, cx, cy):
     for ox in range(-6, 7):
         oy = (ox * ox) // 7
         c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
-    c.draw_line(cx - 5, cy - 4, cx - 6, cy - 8, SOBRANCELHA)
-    c.draw_line(cx - 2, cy - 6, cx - 2, cy - 10, SOBRANCELHA)
-    c.draw_line(cx + 2, cy - 6, cx + 2, cy - 10, SOBRANCELHA)
-    c.draw_line(cx + 5, cy - 4, cx + 6, cy - 8, SOBRANCELHA)
+    c.draw_line(cx - 5, cy - 4, cx - 6, cy - 6, SOBRANCELHA)
+    c.draw_line(cx - 2, cy - 6, cx - 2, cy - 8, SOBRANCELHA)
+    c.draw_line(cx + 2, cy - 6, cx + 2, cy - 8, SOBRANCELHA)
+    c.draw_line(cx + 5, cy - 4, cx + 6, cy - 6, SOBRANCELHA)
 
 def _sobrancelhas(c, estilo):
     sy = FY - 16
