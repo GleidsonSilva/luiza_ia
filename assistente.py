@@ -10,7 +10,7 @@ SR = 16000
 MAX_DURATION = 15
 GAIN = 8.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "glm-4.7-flash:q4_K_M"
+MODEL = "gemma4:e4b"
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
