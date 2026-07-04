@@ -336,6 +336,7 @@ class LuizaApp(App[None]):
     def __init__(self):
         super().__init__()
         self.gravando = False
+        self.processando = False
         self.recording_idx = 0
         self._olho_dir = (0, 0)
 
@@ -404,6 +405,8 @@ class LuizaApp(App[None]):
             self._boca_timer.pause()
 
     def action_toggle_recording(self):
+        if self.processando:
+            return
         if self.gravando:
             self._parar_gravacao()
         else:
@@ -418,8 +421,11 @@ class LuizaApp(App[None]):
 
     def _parar_gravacao(self):
         self.gravando = False
+        self.processando = True
         self._mudar_expressao("transcrevendo")
         audio = np.concatenate(assistente.buf[self.recording_idx:])
+        del assistente.buf[:self.recording_idx]
+        self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),
                          daemon=True).start()
 
@@ -427,6 +433,7 @@ class LuizaApp(App[None]):
         texto = assistente.transcrever(audio)
         if not texto:
             self.call_from_thread(self._voltar_idle)
+            self.processando = False
             return
 
         self.call_from_thread(self._atualizar_stt, texto)
@@ -440,6 +447,7 @@ class LuizaApp(App[None]):
         assistente.falar(resposta)
 
         self.call_from_thread(self._voltar_idle)
+        self.processando = False
 
     def _atualizar_stt(self, texto):
         self.query_one("#stt-text", Static).update(texto)

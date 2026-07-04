@@ -1,4 +1,4 @@
-import sys, os, json, tempfile, select, time
+import sys, os, json, tempfile, select, time, re
 from datetime import datetime
 import numpy as np
 import sounddevice as sd
@@ -150,6 +150,9 @@ def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
     if len(audio) < SR * 0.3:
         return ""
+    rms = np.sqrt(np.mean(audio**2))
+    if rms < 0.03:
+        return ""
     audio = audio * GAIN
     peak = np.max(np.abs(audio))
     if peak > 1.0:
@@ -164,7 +167,10 @@ def transcrever(audio: np.ndarray) -> str:
         initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
     )
     os.remove(tmp)
-    return r["text"].strip()
+    texto = r["text"].strip()
+    if not texto or not re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I):
+        return ""
+    return texto
 
 def perguntar(texto: str) -> str:
     global historico
