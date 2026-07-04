@@ -57,7 +57,9 @@ detetive, palavra secreta
 - Se a crianca perguntar sobre o clima, veja se voce sabe a cidade dela
 - Se souber a cidade, use a funcao buscar_clima
 - Se nao souber, pergunte primeiro onde ela mora
-- Se ela perguntar algo que voce nao sabe, use a funcao buscar_web"""
+- Se a crianca mencionar um animal, brinquedo, lugar ou assunto que voce nao conhece bem, pesquise com buscar_web
+- Se ela falar "vamos falar sobre X" e voce nao souber muito, busque informacoes
+- Nao finja saber de algo que nao conhece — pesquise"""
 
 tools = [
     {
