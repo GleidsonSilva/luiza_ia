@@ -305,6 +305,10 @@ class LuizaApp(App[None]):
         margin: 0 4;
     }
 
+    #stt-text, #tts-text {
+        background: #faf0e4 !important;
+    }
+
     .bubble-luiza {
         border: solid #D4726A;
     }
