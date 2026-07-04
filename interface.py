@@ -71,6 +71,9 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
     elif estilo == "up":
         _filled_circle(c, cx - 1, cy - 2, 2, OLHO)
+    elif estilo == "olhando":
+        _filled_circle(c, cx + fdx, cy + fdy, 3, OLHO)
+        c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
 
 def _boca_curva(c, cx, cy, abertura, largura):
     for dx in range(-largura, largura + 1):
@@ -153,7 +156,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=False):
+def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     c.clear()
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
@@ -162,8 +165,8 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False):
 
     if expressao == "idle":
         _sobrancelhas(c, "neutra")
-        _olho(c, EYE_L, EYE_Y, "normal")
-        _olho(c, EYE_R, EYE_Y, "normal")
+        _olho(c, EYE_L, EYE_Y, "olhando", *olho_dir)
+        _olho(c, EYE_R, EYE_Y, "olhando", *olho_dir)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
@@ -279,6 +282,7 @@ class LuizaApp(App[None]):
         super().__init__()
         self.gravando = False
         self.recording_idx = 0
+        self._olho_dir = (0, 0)
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -294,6 +298,7 @@ class LuizaApp(App[None]):
         self._boca_timer = self.set_interval(1 / 8, self._avancar_boca,
                                              pause=True)
         self._agendar_piscar()
+        self._agendar_olhar()
         self._atualizar_rosto()
 
     def _agendar_piscar(self):
@@ -307,6 +312,18 @@ class LuizaApp(App[None]):
     def _abrir_olhos(self):
         self._piscando = False
         self._atualizar_rosto()
+
+    DIRECOES = [(0,0), (-2,0), (2,0), (0,-2), (0,1),
+                (-2,-1), (2,-1), (-2,1), (2,1)]
+
+    def _agendar_olhar(self):
+        self.set_timer(random.uniform(5, 15), self._olhar_aleatorio)
+
+    def _olhar_aleatorio(self):
+        if self.expressao == "idle":
+            self._olho_dir = random.choice(self.DIRECOES)
+            self._atualizar_rosto()
+        self._agendar_olhar()
         self._agendar_piscar()
 
     def _avancar_boca(self):
@@ -318,7 +335,7 @@ class LuizaApp(App[None]):
         canvas = self.query_one("#rosto", Canvas)
         with canvas.batch_refresh():
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
-                           self._piscando)
+                           self._piscando, self._olho_dir)
 
     def _mudar_expressao(self, expressao):
         self.expressao = expressao
