@@ -184,8 +184,7 @@ def _corpo(c):
         for y in range(57, 59):
             c.set_pixel(x, y, PELE)
     for y in range(59, H):
-        half = 12 + (y - 59) // 2
-        for x in range(FX - half, FX + half + 1):
+        for x in range(FX - 12, FX + 13):
             c.set_pixel(x, y, DRESS)
 
 def _cabelo_atras(c):
