@@ -10,7 +10,7 @@ from textual_canvas import Canvas
 from textual.color import Color
 
 W, H = 120, 72
-FX, FY = 60, 44
+FX, FY = 60, 46
 
 PELE = Color(255, 200, 160)
 OLHO = Color(70, 148, 80)
@@ -124,7 +124,7 @@ def _sobrancelhas(c, estilo):
         c.draw_line(72, sy + 2, 92, sy - 2, SOBRANCELHA)
 
 def _cabelo_atras(c):
-    _filled_oval(c, FX, FY - 18, 68, 36, CABELO)
+    _filled_oval(c, FX, FY - 28, 68, 36, CABELO)
     _filled_oval(c, FX - 48, FY - 10, 20, 28, CABELO)
     _filled_oval(c, FX + 48, FY - 10, 20, 28, CABELO)
 
