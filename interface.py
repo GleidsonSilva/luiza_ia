@@ -27,7 +27,6 @@ WINDOW_GLASS = Color(170, 210, 240)
 MOON = Color(255, 250, 220)
 STAR = Color(255, 255, 200)
 FRAME = Color(160, 100, 70)
-PICTURE = Color(230, 215, 195)
 RUG = Color(210, 160, 180)
 DRESS = Color(180, 180, 240)
 
@@ -159,15 +158,6 @@ def _janela(c):
     c.draw_line(111, 3, 111, 20, FRAME)
     c.draw_line(103, 11, 119, 11, FRAME)
 
-def _quadro_janela(c):
-    for y in range(7, 16):
-        for x in range(107, 115):
-            c.set_pixel(x, y, PICTURE)
-    c.draw_line(106, 6, 115, 6, FRAME)
-    c.draw_line(106, 6, 106, 16, FRAME)
-    c.draw_line(115, 6, 115, 16, FRAME)
-    c.draw_line(106, 16, 115, 16, FRAME)
-
 def _lua_estrelas(c):
     _filled_circle(c, 16, 10, 6, MOON)
     _filled_circle(c, 13, 8, 5, WALL)
@@ -210,7 +200,6 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
     c.clear()
     _tapete(c)
     _janela(c)
-    _quadro_janela(c)
     _lua_estrelas(c)
     _corpo(c)
     _cabelo_atras(c)
