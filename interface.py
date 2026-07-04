@@ -276,17 +276,21 @@ class LuizaApp(App[None]):
     CSS = """
     Screen {
         background: #f5e1c8;
+        padding: 0;
     }
 
     #face-wrapper {
         height: 38;
         align: center middle;
+        background: #f5e1c8;
+        padding: 0;
     }
 
     Canvas {
-        background: #000000;
+        background: #f5e1c8;
         width: 120;
         height: 38;
+        padding: 0;
     }
 
     #status {
