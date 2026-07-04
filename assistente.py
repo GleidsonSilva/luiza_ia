@@ -57,7 +57,7 @@ detetive, palavra secreta
 mem = memoria.carregar()
 historico = []
 
-PITCH_SHIFT = 5.0  # semitons (positivo = mais agudo, infantil)
+PITCH_SHIFT = 2.5  # semitons (positivo = mais agudo, infantil)
 
 def pitch_shift(x: np.ndarray, sr: int, n_semitones: float) -> np.ndarray:
     ratio = 2.0 ** (n_semitones / 12.0)
@@ -163,7 +163,7 @@ def perguntar(texto: str) -> str:
     return resposta
 
 def falar(texto: str):
-    samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")
+    samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.15, lang="pt-br")
     samples = pitch_shift(samples, sr, PITCH_SHIFT)
     sd.play(samples, sr)
     sd.wait()
