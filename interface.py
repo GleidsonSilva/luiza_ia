@@ -1,4 +1,4 @@
-import threading
+import threading, random
 import numpy as np
 import assistente
 
@@ -41,7 +41,7 @@ def _filled_circle(c, cx, cy, r, color):
             if dx * dx + dy * dy <= r * r:
                 c.set_pixel(cx + dx, cy + dy, color)
 
-def _olho(c, cx, cy, estilo):
+def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
     _filled_circle(c, cx, cy, 7, BRANCO)
     c.draw_circle(cx, cy, 7, OLHO)
     if estilo == "normal":
@@ -52,7 +52,7 @@ def _olho(c, cx, cy, estilo):
         c.set_pixel(cx + 1, cy - 1, BRANCO)
         c.draw_line(cx - 7, cy + 6, cx + 7, cy + 6, OLHO)
     elif estilo == "focused":
-        _filled_circle(c, cx - 1, cy - 2, 3, OLHO)
+        _filled_circle(c, cx + fdx, cy + fdy, 3, OLHO)
     elif estilo == "up":
         _filled_circle(c, cx - 1, cy - 3, 3, OLHO)
 
@@ -126,8 +126,9 @@ def desenhar_rosto(c, expressao, frame_boca):
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "franzida")
-        _olho(c, EYE_L, EYE_Y, "focused")
-        _olho(c, EYE_R, EYE_Y, "focused")
+        fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
+        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy)
+        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "pensando":
