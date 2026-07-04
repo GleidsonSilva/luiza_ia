@@ -5,17 +5,29 @@ import soundfile as sf
 import mlx_whisper
 import requests
 from kokoro_onnx import Kokoro
+import memoria
+import jogos
 
 SR = 16000
 MAX_DURATION = 15
 GAIN = 8.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
+MAX_HISTORICO = 5
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
 
-SYSTEM_PROMPT = "Você é um assistente infantil amigável, alegre e divertido. Responda em português brasileiro de forma curta, clara e simples, como se falasse com uma crianca. Nao use emotes, emojis ou simbolos."
+SYSTEM_PROMPT = """Voce eh a Luna, uma amiga virtual divertida de 8 anos.
+Voce adora brincar, fazer perguntas, inventar historias e descobrir coisas novas junto com seu amigo.
+Fala com entusiasmo infantil, usando portugues brasileiro.
+NUNCA se comporte como assistente ou robo — voce eh uma amiga de verdade.
+Nao use emojis ou simbolos.
+
+Brincadeiras que voce conhece: forca, adivinhacao, 20 perguntas, simao diz, historia coletiva, detetive, palavra secreta, caca ao tesouro."""
+
+mem = memoria.carregar()
+historico = []
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     mask = np.abs(audio) > threshold
@@ -45,15 +57,34 @@ def transcrever(audio: np.ndarray) -> str:
     return r["text"].strip()
 
 def perguntar(texto: str) -> str:
+    global historico
+    memorias = memoria.formatar_para_prompt(mem)
+    system = SYSTEM_PROMPT
+    if memorias:
+        system += f"\n\nCoisas que voce sabe sobre seu amigo:\n{memorias}"
+
+    messages = [{"role": "system", "content": system}]
+    messages.extend(historico)
+    messages.append({"role": "user", "content": texto})
+
     r = requests.post(OLLAMA_URL, json={
         "model": MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": texto}
-        ],
+        "messages": messages,
         "stream": False
     })
-    return r.json()["message"]["content"].strip()
+    resposta = r.json()["message"]["content"].strip()
+
+    historico.append({"role": "user", "content": texto})
+    historico.append({"role": "assistant", "content": resposta})
+    if len(historico) > MAX_HISTORICO * 2:
+        historico = historico[-(MAX_HISTORICO * 2):]
+
+    memoria.extrair_fatos(texto + " " + resposta, mem)
+    memoria.extrair_temas(texto + " " + resposta, mem)
+    memoria.extrair_jogos(texto + " " + resposta, mem)
+    memoria.salvar(mem)
+
+    return resposta
 
 def falar(texto: str):
     samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")
@@ -66,10 +97,13 @@ def key_pressed() -> bool:
         return True
     return False
 
-print("╔══════════════════════════════════╗")
-print("║   Assistente de Voz Infantil     ║")
-print("╚══════════════════════════════════╝")
-print("ENTER para falar, ENTER de novo para parar (ou 15s max)")
+nome_crianca = mem.get("crianca", {}).get("nome", "")
+if nome_crianca:
+    print(f"Ola {nome_crianca}! A Luna ja esta aqui!")
+else:
+    print("Ola! Eu sou a Luna! Qual o seu nome?")
+
+print("ENTER para falar, ENTER de novo para parar")
 
 buf = []
 stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
@@ -79,10 +113,10 @@ stream.start()
 while True:
     while select.select([sys.stdin], [], [], 0)[0]:
         sys.stdin.readline()
-    input("\n▶  ENTER para falar...")
+    input("\nPressione ENTER para falar com a Luna...")
 
     idx = len(buf)
-    print("🎤 Gravando... (ENTER para parar)", end="", flush=True)
+    print("Falando... (ENTER para parar)", end="", flush=True)
     inicio = time.time()
 
     while True:
@@ -91,23 +125,23 @@ while True:
             print("")
             break
         if time.time() - inicio > MAX_DURATION:
-            print(" (tempo máximo)")
+            print(" (tempo maximo)")
             break
 
     full = np.concatenate(buf[idx:])
 
-    print("📝 Transcrevendo...")
+    print("Entendendo...")
     texto = transcrever(full)
 
     if not texto:
-        print("Nada reconhecido.")
+        print("Nao entendi. Pode falar de novo?")
         continue
 
-    print(f"   Você: {texto}")
+    print(f"  Voce: {texto}")
 
-    print("🤖 Pensando...")
+    print("Pensando...")
     resposta = perguntar(texto)
-    print(f"   Assistente: {resposta}")
+    print(f"  Luna: {resposta}")
 
-    print("🔊 Falando...")
+    print("Falando...")
     falar(resposta)
