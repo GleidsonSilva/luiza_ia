@@ -103,17 +103,21 @@ def _filled_circle(c, cx, cy, r, color):
             if dx * dx + dy * dy <= r * r:
                 c.set_pixel(x, y, color)
 
-def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
+def _olho(c, cx, cy, estilo, fdx=0, fdy=0, rms=0.0, t=0.0):
     _filled_circle(c, cx, cy, 6, BRANCO)
     c.draw_circle(cx, cy, 6, SOBRANCELHA)
     if estilo == "normal":
-        _filled_circle(c, cx, cy, 3, OLHO)
-        c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.set_pixel(cx, cy - 2, Color(120, 180, 130))
+        pr = 3 + int(min(1.5, rms * 3))
+        _filled_circle(c, cx + fdx, cy + fdy, pr, OLHO)
+        c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
+        c.set_pixel(cx - 1 + fdx, cy + 1 + fdy, Color(120, 180, 130))
     elif estilo == "happy":
-        _filled_circle(c, cx, cy, 3, OLHO)
-        c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.set_pixel(cx, cy - 2, Color(120, 180, 130))
+        pr = 3 + int(min(1.5, rms * 3))
+        _filled_circle(c, cx + fdx, cy + fdy, pr, OLHO)
+        c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
+        c.set_pixel(cx - 1 + fdx, cy + 1 + fdy, Color(120, 180, 130))
+        if rms > 0.02:
+            c.set_pixel(cx + fdx, cy - 2 + fdy, Color(120, 180, 130))
     elif estilo == "focused":
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
         c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
@@ -138,21 +142,29 @@ def _boca_curva(c, cx, cy, abertura, largura):
                 max(0, BOCA_COR.b - 30)
             ))
 
-def _boca_retang(c, cx, cy, w, h):
+def _boca_retang(c, cx, cy, w, h, inner=False, curve=True):
     shadow = Color(
         max(0, BOCA_COR.r - 40),
         max(0, BOCA_COR.g - 40),
         max(0, BOCA_COR.b - 40)
     )
+    mid = h // 2
     for dy in range(h):
-        for dx in range(-w, w + 1):
+        cap = int((1 - ((dy - mid) / max(1, mid)) ** 2) * (w if curve else w))
+        actual_w = max(1, cap)
+        actual_w = min(actual_w, w)
+        for dx in range(-actual_w, actual_w + 1):
             c.set_pixel(cx + dx, cy + dy, BOCA_COR)
-            if dy == h - 1 and dx % 2 == 0:
+            if dy == h - 1 and dx % 2 == 0 and curve:
                 c.set_pixel(cx + dx, cy + dy + 1, shadow)
+    if inner and h > 2:
+        teeth = Color(255, 245, 230)
+        for dx in range(-w + 1, w):
+            c.set_pixel(cx + dx, cy + 1, teeth)
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 6, 13)
+        _boca_curva(c, cx, cy, 7, 13)
     elif forma == "slight":
         _boca_curva(c, cx, cy, 4, 9)
     elif forma == "open_small":
@@ -174,6 +186,24 @@ def _boca(c, cx, cy, forma):
     elif forma == "open_wide":
         _boca_retang(c, cx, cy, 7, 7)
 
+def _boca_altura(forma):
+    if forma == "smile": return 6
+    if forma == "slight": return 4
+    if forma == "open_small": return 4
+    if forma == "open_medium": return 6
+    if forma == "open_large": return 6
+    if forma == "thinking": return 2
+    if forma == "surprised": return 5
+    if forma == "open_wide": return 7
+    return 3
+
+def _boca_dinamica(c, cx, cy, base_forma, rms, frame):
+    base = _boca_altura(base_forma)
+    h = max(2, base + int(rms * 14))
+    h = min(7, h)
+    w = max(3, min(6, int(h * 0.9 + rms * 6)))
+    _boca_retang(c, cx, cy, w, h, inner=rms > 0.04)
+
 def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 3, BLUSH)
     _filled_circle(c, FX + 22, FY + 2, 3, BLUSH)
@@ -191,21 +221,45 @@ def _palpebra(c, cx, cy):
 
 def _olho_fechado(c, cx, cy):
     _filled_circle(c, cx, cy, 7, PELE)
-    c.draw_line(cx - 7, cy, cx + 7, cy, SOBRANCELHA)
+    for x in range(cx - 7, cx + 8):
+        oy = ((x - cx) ** 2) // 7
+        c.set_pixel(x, cy - 7 + oy, SOBRANCELHA)
 
-def _sobrancelhas(c, estilo):
+def _sobrancelha_traca(c, x1, x2, y1, y2, espessura=1):
+    length = max(1, abs(x2 - x1))
+    step = 1 if x2 >= x1 else -1
+    for x in range(x1, x2 + step, step):
+        t = (x - x1) / length
+        y = int(y1 + t * (y2 - y1))
+        for dy in range(-espessura, espessura + 1):
+            c.set_pixel(x, y + dy, SOBRANCELHA)
+
+def _sobrancelhas(c, estado, t=0.0, rms=0.0):
     sy = FY - 16
-    if estilo == "neutra":
+    if estado == "neutra":
+        oy_neutra = int(1.5 * np.sin(t * 0.7))
         for ox in range(-7, 8):
-            oy = (ox * ox) // 12
-            c.set_pixel(FX - 16 + ox, sy - 4 + oy, SOBRANCELHA)
-            c.set_pixel(FX + 16 + ox, sy - 4 + oy, SOBRANCELHA)
-    elif estilo == "franzida":
-        c.draw_line(FX - 26, sy + 2, FX - 10, sy - 2, SOBRANCELHA)
-        c.draw_line(FX + 10, sy - 2, FX + 26, sy + 2, SOBRANCELHA)
-    elif estilo == "curiosa":
-        c.draw_line(FX - 24, sy - 2, FX - 8, sy + 2, SOBRANCELHA)
-        c.draw_line(FX + 8, sy + 2, FX + 24, sy - 2, SOBRANCELHA)
+            oy = (ox * ox) // 20
+            c.set_pixel(FX - 16 + ox, sy - 3 + oy + oy_neutra, SOBRANCELHA)
+            c.set_pixel(FX - 16 + ox, sy - 4 + oy + oy_neutra, SOBRANCELHA)
+            c.set_pixel(FX + 16 + ox, sy - 3 + oy + oy_neutra, SOBRANCELHA)
+            c.set_pixel(FX + 16 + ox, sy - 4 + oy + oy_neutra, SOBRANCELHA)
+    elif estado == "franzida":
+        _sobrancelha_traca(c, FX - 26, FX - 10, sy + 2, sy - 2, 1)
+        _sobrancelha_traca(c, FX + 10, FX + 26, sy - 2, sy + 2, 1)
+    elif estado == "curiosa":
+        _sobrancelha_traca(c, FX - 24, FX - 8, sy - 2, sy + 2, 1)
+        _sobrancelha_traca(c, FX + 8, FX + 24, sy + 2, sy - 2, 1)
+    elif estado == "triste":
+        _sobrancelha_traca(c, FX - 24, FX - 10, sy + 2, sy + 4, 1)
+        _sobrancelha_traca(c, FX + 10, FX + 24, sy + 4, sy + 2, 1)
+    elif estado == "brava":
+        _sobrancelha_traca(c, FX - 24, FX - 10, sy - 4, sy, 1)
+        _sobrancelha_traca(c, FX + 10, FX + 24, sy, sy - 4, 1)
+    elif estado == "animada":
+        oy_anim = int(2 * np.sin(t * 2.5))
+        _sobrancelha_traca(c, FX - 23, FX - 9, sy - 3 + oy_anim, sy - 1 + oy_anim, 1)
+        _sobrancelha_traca(c, FX + 9, FX + 23, sy - 1 - oy_anim, sy - 3 - oy_anim, 1)
 
 def _tapete(c):
     _filled_oval(c, FX, 67, 30, 4, RUG)
@@ -288,7 +342,7 @@ def _barras_audio(c, rms=0.0):
             for x in range(bx + i * 4, bx + i * 4 + 2):
                 c.set_pixel(x, y, STAR)
 
- 
+  
 def _corpo(c):
     for x in range(56, 64):
         for y in range(57, 59):
@@ -326,7 +380,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None):
+def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None):
     if now is None:
         now = time.time()
     c.clear()
@@ -340,48 +394,76 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
     _lacinho(c)
 
     if expressao == "idle":
-        _sobrancelhas(c, "neutra")
-        _olho(c, EYE_L, EYE_Y, "olhando", *olho_dir)
-        _olho(c, EYE_R, EYE_Y, "olhando", *olho_dir)
+        _sobrancelhas(c, "neutra", t=now)
+        _olho(c, EYE_L, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
+        _olho(c, EYE_R, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
-        _sobrancelhas(c, "neutra")
-        _olho(c, EYE_L, EYE_Y, "normal")
-        _olho(c, EYE_R, EYE_Y, "normal")
+        _sobrancelhas(c, "neutra", t=now)
+        _olho(c, EYE_L, EYE_Y, "normal", rms=audio_rms, t=now)
+        _olho(c, EYE_R, EYE_Y, "normal", rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
         _barras_audio(c, rms=audio_rms)
     elif expressao == "pensando":
-        _sobrancelhas(c, "franzida")
+        _sobrancelhas(c, "franzida", t=now)
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
-        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy)
-        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy)
+        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
+        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
-        _sobrancelhas(c, "neutra")
-        _olho(c, EYE_L, EYE_Y - 3, "up")
-        _olho(c, EYE_R, EYE_Y - 3, "up")
+        _sobrancelhas(c, "curiosa", t=now)
+        _olho(c, EYE_L, EYE_Y - 3, "up", rms=0.0, t=now)
+        _olho(c, EYE_R, EYE_Y - 3, "up", rms=0.0, t=now)
         _palpebra(c, EYE_L, EYE_Y - 3)
         _palpebra(c, EYE_R, EYE_Y - 3)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
-        _sobrancelhas(c, "neutra")
-        _olho(c, EYE_L, EYE_Y, "happy")
-        _olho(c, EYE_R, EYE_Y, "happy")
+        _sobrancelhas(c, "neutra", t=now)
+        _olho(c, EYE_L, EYE_Y, "happy", rms=audio_rms, t=now)
+        _olho(c, EYE_R, EYE_Y, "happy", rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
-        _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
+        if mouth_h is not None:
+            w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
+            _boca_retang(c, FX, MOUTH_Y, w, int(mouth_h), inner=audio_rms > 0.04)
+        else:
+            _boca_dinamica(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
         _barras_audio(c, rms=audio_rms)
+    elif expressao == "triste":
+        _sobrancelhas(c, "triste", t=now)
+        _olho(c, EYE_L, EYE_Y, "normal", fdy=1, rms=0.0, t=now)
+        _olho(c, EYE_R, EYE_Y, "normal", fdy=1, rms=0.0, t=now)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
+        _blush(c)
+        _boca(c, FX, MOUTH_Y, "slight")
+    elif expressao == "brava":
+        _sobrancelhas(c, "brava", t=now)
+        _olho(c, EYE_L, EYE_Y, "focused", fdx=-1, fdy=-1, rms=0.0, t=now)
+        _olho(c, EYE_R, EYE_Y, "focused", fdx=1, fdy=-1, rms=0.0, t=now)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
+        _blush(c)
+        _boca(c, FX, MOUTH_Y, "slight")
+    elif expressao == "animada":
+        _sobrancelhas(c, "animada", t=now)
+        _olho(c, EYE_L, EYE_Y, "happy", rms=max(audio_rms, 0.15), t=now)
+        _olho(c, EYE_R, EYE_Y, "happy", rms=max(audio_rms, 0.15), t=now)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
+        _blush(c)
+        _boca(c, FX, MOUTH_Y, "smile")
 
     if piscando:
         _olho_fechado(c, EYE_L, EYE_Y - 1)
@@ -520,6 +602,8 @@ class LuizaApp(App[None]):
         self._boca_delay_timer = None
         self._vad = VADBuffer()
         self._audio_rms = 0.0
+        self._mouth_h = 2.0
+        self._mouth_target_h = 2.0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -572,14 +656,20 @@ class LuizaApp(App[None]):
     def _avancar_boca(self):
         self._frame_boca = (self._frame_boca + 1) % len(MOUTH_CYCLE)
         if self.expressao == "falando":
+            base = _boca_altura(MOUTH_CYCLE[self._frame_boca])
+            self._mouth_target_h = max(1, base + int(self._audio_rms * 12))
+            self._mouth_target_h = min(7, self._mouth_target_h)
             self._atualizar_rosto()
 
     def _atualizar_rosto(self):
+        if self.expressao == "falando" and self._mouth_target_h is not None:
+            self._mouth_h += (self._mouth_target_h - self._mouth_h) * 0.55
         canvas = self.query_one("#rosto", Canvas)
         with canvas.batch_refresh():
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
                            self._piscando, self._olho_dir,
-                           audio_rms=self._audio_rms, now=time.time())
+                           audio_rms=self._audio_rms, now=time.time(),
+                           mouth_h=self._mouth_h if self.expressao == "falando" else None)
 
     def _mudar_expressao(self, expressao):
         if self._boca_delay_timer:
@@ -587,6 +677,8 @@ class LuizaApp(App[None]):
             self._boca_delay_timer = None
         self.expressao = expressao
         self._frame_boca = 0
+        self._mouth_h = 2.0
+        self._mouth_target_h = 2.0
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
         status.update(STATUS_MAP.get(expressao, ""))
