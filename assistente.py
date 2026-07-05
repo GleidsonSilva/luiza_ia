@@ -1,4 +1,5 @@
-import sys, os, json, tempfile, select, time, re, threading
+import sys, os, json, tempfile, select, time, re, threading, hashlib
+from typing import Optional
 
 os.environ["HF_HUB_OFFLINE"] = "1"
 
@@ -16,7 +17,6 @@ import mlx_whisper
 import requests
 from kokoro_onnx import Kokoro
 import memoria
-import memoria_rag
 import contexto
 import gerenciador_contexto as ctx_mgr
 import debug
@@ -263,20 +263,12 @@ tools = [
 ]
 
 mem = memoria.carregar()
+child_id_ativo: Optional[str] = None
 _identidade_confirmada = False
 historico = []
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
-_turno_idx = 0
-memoria_vetorial = None
-
-
-def _get_memoria_vetorial():
-    global memoria_vetorial
-    if memoria_vetorial is None:
-        memoria_vetorial = memoria_rag.MemoriaVetorial()
-    return memoria_vetorial
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -365,12 +357,6 @@ def compactar_historico(historico_para_resumir: list[dict]) -> str:
         return ""
 
 
-def _resolver_tool_output(content: str) -> str:
-    if content and content.startswith("memory://"):
-        return ctx_mgr.resolver_ponteiro(content)
-    return content
-
-
 def _executar_calculadora(args: dict) -> str:
     try:
         a = int(args.get("a", 0))
@@ -428,26 +414,13 @@ def _executar_pergunta_matematica(args: dict) -> str:
 
 
 def perguntar(texto: str) -> str:
-    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, _turno_idx, memoria_vetorial
-    mv = _get_memoria_vetorial()
+    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
 
-    memoria_recuperada = memoria_rag.recuperar_fatos_relevantes(mem, texto, limite=5)
+    memoria_recuperada = memoria.formatar_para_prompt(mem)
     if memoria_recuperada:
         system_content += f"\n\n### MEMORIA\n{memoria_recuperada}"
-
-    t0 = time.time()
-    try:
-        recuperado = mv.buscar(texto, k_fatos=4, k_turnos=3)
-    except Exception:
-        recuperado = {"fatos": "", "turnos": ""}
-    debug.log(f"mv.buscar em {time.time()-t0:.2f}s")
-
-    if recuperado["fatos"]:
-        system_content += f"\n\n### MEMORIA_LONGO_PRAZO\n{recuperado['fatos']}"
-    if recuperado["turnos"]:
-        system_content += f"\n\n### CONVERSAS_ANTERIORES\n{recuperado['turnos']}"
 
     if resumo_sessao:
         system_content += f"\n\n### RESUMO_SESSAO\n{resumo_sessao}"
@@ -516,21 +489,19 @@ def perguntar(texto: str) -> str:
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
+                child_id_ativo = hashlib.sha256(args["nome"].lower().strip().encode()).hexdigest()
+                mem = memoria.carregar(child_id_ativo)
                 memoria.adicionar_fato(mem, "nome", args["nome"])
-                mv.indexar_fato("nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
-                mv.indexar_fato(args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
                 needs_rerun = True
             elif name == "buscar_web" and args.get("consulta"):
                 result = contexto.buscar_web(args["consulta"])
-                compressed = ctx_mgr.comprimir_tool_output("buscar_web", result)
-                pointer = ctx_mgr.armazenar_ponteiro(result)
-                result = pointer + "\n\n" + compressed
+                result = ctx_mgr.comprimir_tool_output("buscar_web", result)
                 needs_rerun = True
             elif name == "calculadora":
                 result = _executar_calculadora(args)
@@ -547,18 +518,10 @@ def perguntar(texto: str) -> str:
     memoria.extrair_fatos(texto + " " + resposta, mem)
     memoria.extrair_temas(texto + " " + resposta, mem)
     memoria.extrair_jogos(texto + " " + resposta, mem)
-    memoria.salvar(mem)
+    memoria.salvar(mem, child_id_ativo)
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})
-
-    try:
-        mv.indexar_turno("user", texto, turno_idx=_turno_idx)
-        _turno_idx += 1
-        mv.indexar_turno("assistant", resposta, turno_idx=_turno_idx)
-        _turno_idx += 1
-    except Exception:
-        pass
 
     max_hist = MAX_HISTORICO_TURNOS * 2
     if len(historico) > max_hist:

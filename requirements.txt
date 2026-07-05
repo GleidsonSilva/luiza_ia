@@ -7,4 +7,3 @@ kokoro-onnx
 textual
 textual-canvas
 ddgs
-sentence-transformers

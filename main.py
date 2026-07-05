@@ -45,36 +45,12 @@ def _check_tts():
     return True
 
 
-def _check_embedding():
-    try:
-        from sentence_transformers import SentenceTransformer
-        SentenceTransformer(
-            "paraphrase-multilingual-MiniLM-L12-v2",
-            local_files_only=True
-        )
-        return True
-    except Exception:
-        print("Modelo de embedding nao encontrado em cache. Tentando baixar...")
-        try:
-            old = os.environ.pop("HF_HUB_OFFLINE", None)
-            from sentence_transformers import SentenceTransformer
-            SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
-            if old is not None:
-                os.environ["HF_HUB_OFFLINE"] = old
-            print("  Modelo de embedding baixado com sucesso.")
-            return True
-        except Exception as e:
-            print(f"  Falha ao baixar modelo de embedding: {e}")
-            return False
-
-
 def verificar_dependencias():
     erros = []
     checks = [
         ("Modelos de TTS (Kokoro)", _check_tts),
         ("Ollama + modelo gemma4:e4b", _check_ollama),
         ("Microfone", _check_microfone),
-        ("Modelo de embedding (sentence-transformers)", _check_embedding),
     ]
     for nome, fn in checks:
         if not fn():

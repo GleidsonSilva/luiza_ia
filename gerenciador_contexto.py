@@ -85,28 +85,3 @@ def comprimir_tool_output(nome: str, conteudo: str) -> str:
     if len(tokens) > MAX_TOOL_OUTPUT_TOKENS:
         return " ".join(tokens[:MAX_TOOL_OUTPUT_TOKENS]) + "..."
     return conteudo
-
-
-import os, json, hashlib
-
-MEMORY_EXTERNAL = "memory/external"
-
-
-def armazenar_ponteiro(conteudo: str) -> str:
-    os.makedirs(MEMORY_EXTERNAL, exist_ok=True)
-    key = hashlib.sha256(conteudo.encode()).hexdigest()[:12]
-    path = os.path.join(MEMORY_EXTERNAL, f"{key}.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"conteudo": conteudo}, f, ensure_ascii=False)
-    return f"memory://external/{key}"
-
-
-def resolver_ponteiro(pointer: str) -> str:
-    if not pointer.startswith("memory://"):
-        return pointer
-    key = pointer.split("/")[-1]
-    path = os.path.join(MEMORY_EXTERNAL, f"{key}.json")
-    if not os.path.exists(path):
-        return pointer
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f).get("conteudo", pointer)
