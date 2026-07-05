@@ -308,16 +308,11 @@ def _corpo(c):
             c.set_pixel(x, y, shadow)
 
 def _cabelo_atras(c):
-    shadow = Color(
-        max(0, CABELO.r - 35),
-        max(0, CABELO.g - 35),
-        max(0, CABELO.b - 35)
-    )
     _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
     _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
     _filled_oval(c, FX + 40, FY - 10, 14, 20, CABELO)
-    _filled_oval(c, FX - 35, FY - 10, 10, 18, shadow)
-    _filled_oval(c, FX + 35, FY - 10, 10, 18, shadow)
+    _filled_oval(c, FX - 32, FY + 8, 9, 18, CABELO)
+    _filled_oval(c, FX + 32, FY + 8, 9, 18, CABELO)
 
 def _franja(c):
     for x in range(33, 90, 6):
