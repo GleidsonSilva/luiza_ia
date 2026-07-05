@@ -354,6 +354,26 @@ def _lua_estrelas(c, now=0.0):
         c.set_pixel(sx, sy + 2, star_color)
         c.set_pixel(sx + 1, sy - 1, star_color)
 
+def _vu_meter(c, rms):
+    bx, by = FX, 61
+    half_w = 30
+    fill = min(1.0, rms * 50)
+    filled_px = int(2 * half_w * fill)
+    for dx in range(-half_w, half_w + 1):
+        x = bx + dx
+        if dx <= -half_w + filled_px:
+            if rms < 0.01:
+                cor = Color(100, 180, 100)
+            elif rms < 0.05:
+                cor = Color(180, 220, 80)
+            else:
+                cor = Color(220, 80, 80)
+        else:
+            cor = Color(50, 50, 50)
+        for dy in range(4):
+            c.set_pixel(x, by + dy, cor)
+    c.draw_rectangle(bx - half_w, by, bx + half_w, by + 3, Color(120, 120, 120))
+
 def _barras_audio(c, rms=0.0):
     bars_per_side = 4
     bar_w = 2
@@ -445,6 +465,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _blush(c)
         _nariz(c)
         _boca(c, FX, MOUTH_Y, "slight")
+        _vu_meter(c, rms=audio_rms)
         _barras_audio(c, rms=audio_rms)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
