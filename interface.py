@@ -425,7 +425,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, bubbles=None, bocejando=False, bocejo_frame=0):
+def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, bubbles=None, bocejando=False, bocejo_frame=0, trans_frame=-1, trans_total=0):
     if now is None:
         now = time.time()
     breath_y = int(0.5 * np.sin(now * 2.1))
@@ -542,6 +542,15 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "smile")
+
+    if trans_frame >= 0 and trans_frame < trans_total * 0.4:
+        _olho_fechado(c, eye_l, eye_y - 1)
+        _olho_fechado(c, eye_r, eye_y - 1)
+        for dx in range(-4, 5):
+            c.set_pixel(FX + dx, mouth_y, SOBRANCELHA)
+            c.set_pixel(FX + dx, mouth_y + 1, SOBRANCELHA)
+        if expressao == "falando":
+            _barras_audio(c, rms=audio_rms)
 
     if piscando == 2:
         _olho_fechado(c, eye_l, eye_y - 1)
@@ -676,6 +685,8 @@ class LuizaApp(App[None]):
         self._bubbles = []
         self._bubble_frame = 0
         self._bocejando = False
+        self._trans_frame = -1
+        self._trans_total = 0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -696,6 +707,8 @@ class LuizaApp(App[None]):
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
                                                   pause=True)
         self._bubble_timer = self.set_interval(0.08, self._avancar_bubble,
+                                                  pause=True)
+        self._trans_timer = self.set_interval(1 / 18, self._step_transicao,
                                                   pause=True)
         self._agendar_piscar()
         self._agendar_olhar()
@@ -722,6 +735,13 @@ class LuizaApp(App[None]):
 
     def _abrir_olhos(self):
         self._piscando = 0
+        self._atualizar_rosto()
+
+    def _step_transicao(self):
+        self._trans_frame += 1
+        if self._trans_frame >= self._trans_total:
+            self._trans_frame = -1
+            self._trans_timer.pause()
         self._atualizar_rosto()
 
     def _agendar_bocejo(self):
@@ -801,7 +821,9 @@ class LuizaApp(App[None]):
                            mouth_h=self._mouth_h if self.expressao == "falando" else None,
                            bubbles=self._bubbles if self.expressao in ("transcrevendo", "pensando") else None,
                            bocejando=self._bocejando,
-                           bocejo_frame=self._bocejo_frame if self._bocejando else 0)
+                           bocejo_frame=self._bocejo_frame if self._bocejando else 0,
+                           trans_frame=self._trans_frame,
+                           trans_total=self._trans_total)
 
     def _mudar_expressao(self, expressao):
         if self._boca_delay_timer:
@@ -816,6 +838,11 @@ class LuizaApp(App[None]):
             if self._bocejo_timer:
                 self._bocejo_timer.stop()
                 self._bocejo_timer = None
+        dur = {"ouvindo": 8, "transcrevendo": 10, "pensando": 10,
+               "falando": 8, "idle": 10, "triste": 12}.get(expressao, 6)
+        self._trans_frame = 0
+        self._trans_total = dur
+        self._trans_timer.resume()
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
         status.update(STATUS_MAP.get(expressao, ""))
