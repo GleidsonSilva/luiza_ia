@@ -337,7 +337,7 @@ def transcrever(audio: np.ndarray) -> str:
     os.remove(tmp)
     texto = r["text"].strip()
     debug.log(f"whisper raw: '{texto}'")
-    if not texto or not re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I):
+    if not texto or not (re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I) or re.search(r'^\d+$', texto.strip())):
         debug.log("vowel check failed")
         return ""
     return texto

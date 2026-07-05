@@ -162,6 +162,15 @@ def _boca_curva(c, cx, cy, abertura, largura, assimetrico=0):
         ))
         c.set_pixel(cx + dx, cy - dy + asy, BOCA_COR)
         c.set_pixel(cx + dx, cy - dy + 1 + asy, BOCA_COR)
+        if dx > -largura:
+            pd = int(((dx-1)*(dx-1)) / (largura*largura/abertura) - abertura/2)
+            pa = int(assimetrico * (dx-1) / largura) if assimetrico else 0
+            prev_top = cy - pd + pa
+            curr_top = cy - dy + asy
+            if curr_top > prev_top:
+                c.set_pixel(cx + dx, prev_top, BOCA_COR)
+            if curr_top < prev_top:
+                c.set_pixel(cx + dx - 1, curr_top, BOCA_COR)
         if abs(dx) <= largura // 3:
             hl = Color(
                 min(255, BOCA_COR.r + 40),
