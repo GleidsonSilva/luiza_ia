@@ -206,6 +206,18 @@ def _lua_estrelas(c):
         c.set_pixel(sx, sy + 2, STAR)
         c.set_pixel(sx + 1, sy - 1, STAR)
 
+def _barras_audio(c):
+    bx, by = 100, 50
+    alturas = [2, 3, 4, 3]
+    t = int(time.time() * 6) % 3
+    offsets = [-1, 0, 1]
+    for i, base_h in enumerate(alturas):
+        h = base_h + offsets[(t + i) % 3]
+        h = max(1, h)
+        for y in range(by - h, by + h):
+            for x in range(bx + i * 4, bx + i * 4 + 2):
+                c.set_pixel(x, y, STAR)
+
  
 def _corpo(c):
     for x in range(56, 64):
@@ -261,6 +273,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
+        _barras_audio(c)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida")
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
@@ -304,6 +317,7 @@ class LuizaApp(App[None]):
         align: center middle;
         background: #f5e1c8;
         padding: 0;
+        width: 1fr;
     }
 
     Canvas {
@@ -319,23 +333,6 @@ class LuizaApp(App[None]):
         margin-bottom: 1;
     }
 
-    .bubble-row {
-        height: 3;
-        margin: 0 4;
-    }
-
-    .label {
-        height: 1;
-        color: #555;
-        text-style: bold;
-        margin: 0 4;
-        margin-top: 1;
-    }
-
-    .label-luiza {
-        color: #D4726A;
-    }
-
     .bubble {
         background: #fcf0e0;
         border: solid #d0c0a8;
@@ -343,14 +340,17 @@ class LuizaApp(App[None]):
         padding: 0 2;
         height: 5;
         margin: 0 4;
-    }
-
-    #stt-text, #tts-text {
-        background: #fcf0e0 !important;
+        overflow: hidden;
     }
 
     .bubble-luiza {
         border: solid #D4726A;
+    }
+
+    .bubble-erro {
+        border: solid #F44336;
+        color: #B71C1C;
+        background: #fff0f0;
     }
 
     #hint {
@@ -398,6 +398,8 @@ class LuizaApp(App[None]):
     expressao = reactive("idle")
     _frame_boca = 0
     _piscando = False
+    _typing_timer = None
+    _typing_target = None
 
     def __init__(self):
         super().__init__()
@@ -476,10 +478,38 @@ class LuizaApp(App[None]):
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
         status.update(STATUS_MAP.get(expressao, ""))
+        if expressao == "idle":
+            try:
+                self.query_one("#tts-text", Static).remove_class("bubble-erro")
+            except Exception:
+                pass
         if expressao == "falando":
             self._boca_delay_timer = self.set_timer(0.5, self._iniciar_animacao_boca)
         else:
             self._boca_timer.pause()
+
+    def _start_typing(self, widget_id, text, speed=0.04, is_error=False):
+        self._cancel_typing()
+        target = self.query_one(f"#{widget_id}", Static)
+        if is_error:
+            target.add_class("bubble-erro")
+        else:
+            target.remove_class("bubble-erro")
+        idx = 0
+        def _step():
+            nonlocal idx
+            idx += 1
+            target.update(text[:idx])
+            if idx < len(text):
+                self._typing_timer = self.set_timer(speed, _step)
+            else:
+                self._typing_timer = None
+        _step()
+
+    def _cancel_typing(self):
+        if self._typing_timer:
+            self._typing_timer.cancel()
+            self._typing_timer = None
 
     def _iniciar_animacao_boca(self):
         self._boca_delay_timer = None
@@ -493,8 +523,8 @@ class LuizaApp(App[None]):
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
-        self.query_one("#stt-text", Static).update("")
-        self.query_one("#tts-text", Static).update("")
+        self._start_typing("stt-text", "")
+        self._start_typing("tts-text", "")
 
     def _parar_gravacao(self):
         self._silencio_timer.pause()
@@ -578,7 +608,7 @@ class LuizaApp(App[None]):
             tb = io.StringIO()
             traceback.print_exc(file=tb)
             debug.log(f"ERRO: {e}\n{tb.getvalue()}")
-            self.call_from_thread(self._atualizar_tts, f"Erro: {e}")
+            self.call_from_thread(self._atualizar_tts_erro, f"Erro: {e}")
         finally:
             debug.log("_processar finalizando")
             self.call_from_thread(self._voltar_idle)
@@ -587,12 +617,16 @@ class LuizaApp(App[None]):
     def _atualizar_stt(self, texto):
         if texto:
             texto = re.sub(r'\s+', ' ', texto).strip()
-        self.query_one("#stt-text", Static).update(texto)
+        self._start_typing("stt-text", texto or "")
 
     def _atualizar_tts(self, texto):
         if texto:
             texto = re.sub(r'\s+', ' ', texto).strip()
-        self.query_one("#tts-text", Static).update(texto)
+        self._start_typing("tts-text", texto or "")
+
+    def _atualizar_tts_erro(self, texto):
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        self._start_typing("tts-text", texto, is_error=True)
 
     def _atualizar_ctx(self):
         s = assistente.ultimo_ctx_status
