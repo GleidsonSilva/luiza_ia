@@ -1,4 +1,5 @@
 import os, sys, tempfile
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 import sounddevice as sd
 import soundfile as sf
 import mlx_whisper

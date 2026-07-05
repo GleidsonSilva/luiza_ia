@@ -1,5 +1,7 @@
 import sys, os, json, tempfile, select, time, re, threading
 
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 import tqdm.std
 tqdm.std.TqdmDefaultWriteLock.mp_lock = threading.RLock()
 tqdm.std.TqdmDefaultWriteLock.create_mp_lock = classmethod(
