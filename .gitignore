@@ -6,3 +6,6 @@ __pycache__/
 *.wav
 memoria.json
 debug.log
+
+/historico/
+historico/session_ativa.json

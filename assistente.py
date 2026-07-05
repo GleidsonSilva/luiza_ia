@@ -19,6 +19,7 @@ from kokoro_onnx import Kokoro
 import memoria
 import contexto
 import gerenciador_contexto as ctx_mgr
+import historico
 import debug
 
 SR = 16000
@@ -102,6 +103,7 @@ OUTRAS FERRAMENTAS:
 5. buscar_web: quando menciona algo desconhecido e voce precisa informar
 6. calculadora: quando ela pedir uma conta especifica
 7. pergunta_matematica: EXCLUSIVO para brincadeira de matematica
+8. buscar_historico: quando voce quiser lembrar de conversas antigas com a crianca. Parametros: query (palavra-chave), child_id (hex da crianca, opcional), ultimas_n_sessoes (quantas sessoes recentes ver, default 5), max_results (default 50). Retorna mensagens do historico local. Use para lembrar de detalhes, temas ou brincadeiras antigas.
 
 REGRAS DE USO:
 - Leia o resultado da ferramenta e responda como a Luiza naturalmente, incorporando a informacao como se ja soubesse. NUNCA mencione que fez uma busca ou consulta.
@@ -293,13 +295,44 @@ tools = [
                 "required": ["operacao", "quantidade"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_historico",
+            "description": "Busca no historico local de conversas por palavra, crianca ou periodo. Retorna ate max_results resultados recentes, filtrando por ultimas_n_sessoes. Use para lembrar do que ja conversou com a crianca. Retorna itens com session_id, timestamp, role e content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Palavra-chave para buscar no texto. Vazio retorna historico recente sem filtro de texto. Case-insensitive."
+                    },
+                    "child_id": {
+                        "type": "string",
+                        "description": "Hex da crianca para filtrar. Obrigatorio quando quiser buscar apenas conversas de uma crianca especifica."
+                    },
+                    "ultimas_n_sessoes": {
+                        "type": "integer",
+                        "description": "Quantidade de sessoes mais recentes a consultar. Padrao: 5.",
+                        "default": 5
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Limite maximo de mensagens retornadas. Padrao: 50.",
+                        "default": 50
+                    }
+                },
+                "required": ["ultimas_n_sessoes", "max_results"]
+            }
+        }
     }
 ]
 
 mem = memoria.carregar()
 child_id_ativo: Optional[str] = None
 _identidade_confirmada = False
-historico = []
+session_id, historico = historico.carregar_ativa()
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
@@ -604,6 +637,29 @@ def perguntar(texto: str) -> str:
             elif name == "pergunta_matematica":
                 result = _executar_pergunta_matematica(args)
                 debug.log(f"tool: pergunta_matematica -> {result}")
+            elif name == "buscar_historico":
+                arg_q = args.get("query", "")
+                arg_child = args.get("child_id") or None
+                try:
+                    arg_ult = int(args.get("ultimas_n_sessoes", 5))
+                except Exception:
+                    arg_ult = 5
+                try:
+                    arg_max = int(args.get("max_results", 50))
+                except Exception:
+                    arg_max = 50
+                itens = historico.buscar(
+                    query=arg_q,
+                    child_id=arg_child,
+                    max_results=arg_max,
+                    ultimas_n_sessoes=arg_ult,
+                )
+                try:
+                    import json as _json
+                    result = _json.dumps(itens, ensure_ascii=False)
+                except Exception as e:
+                    result = f"[]"
+                debug.log(f"tool: buscar_historico -> {len(itens)} itens")
             else:
                 result = "Nao conheco essa ferramenta."
                 debug.log(f"tool: desconhecida '{name}'")
@@ -623,6 +679,11 @@ def perguntar(texto: str) -> str:
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})
+    try:
+        historico.salvar_mensagem(session_id, "user", texto, child_id=child_id_ativo)
+        historico.salvar_mensagem(session_id, "assistant", resposta, child_id=child_id_ativo)
+    except Exception as e:
+        debug.log(f"erro_historico_salvar: {e}")
 
     max_hist = MAX_HISTORICO_TURNOS * 2
     if len(historico) > max_hist:
