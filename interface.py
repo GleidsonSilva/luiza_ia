@@ -250,8 +250,6 @@ def _blush(c):
     _filled_circle(c, FX + 22, FY + 2, 3, BLUSH)
 
 def _nariz(c):
-    c.set_pixel(FX - 1, FY + 1, NARIZ)
-    c.set_pixel(FX, FY + 1, NARIZ)
     c.set_pixel(FX - 1, FY + 2, NARIZ)
     c.set_pixel(FX, FY + 2, NARIZ)
 
