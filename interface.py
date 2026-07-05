@@ -1,4 +1,4 @@
-import threading, random, time, re
+import math, threading, random, time, re
 import numpy as np
 import sounddevice as sd
 import assistente
@@ -260,7 +260,7 @@ def _sobrancelha_traca(c, x1, x2, y1, y2, espessura=1):
 def _sobrancelhas(c, estado, t=0.0, rms=0.0):
     sy = FY - 16
     if estado == "neutra":
-        oy_neutra = int(0.6 * np.sin(t * 0.7))
+        oy_neutra = int(0.6 * math.sin(t * 0.7))
         for ox in range(-7, 8):
             oy = (ox * ox) // 20
             c.set_pixel(FX - 16 + ox, sy - 3 + oy + oy_neutra, SOBRANCELHA)
@@ -280,7 +280,7 @@ def _sobrancelhas(c, estado, t=0.0, rms=0.0):
         _sobrancelha_traca(c, FX - 24, FX - 10, sy - 4, sy, 1)
         _sobrancelha_traca(c, FX + 10, FX + 24, sy, sy - 4, 1)
     elif estado == "feliz":
-        oy_anim = int(1.5 * np.sin(t * 2.5))
+        oy_anim = int(1.5 * math.sin(t * 2.5))
         for side, sign in [(FX - 16, -1), (FX + 16, 1)]:
             for x in range(side - 7, side + 8):
                 base_y = (sy - 4)
@@ -302,9 +302,8 @@ def _tapete(c):
 
 def _janela(c, now=None):
     if now is None:
-        now = time.time()
-    lt = time.localtime(now)
-    hour = lt.tm_hour
+        now = time.monotonic()
+    hour = time.localtime(time.time()).tm_hour
     if hour >= 6 and hour < 12:
         glass = Color(210, 225, 250)
         frame = Color(170, 110, 80)
@@ -331,7 +330,7 @@ def _janela(c, now=None):
         stars = [(106, 5), (113, 8), (107, 14), (115, 16), (109, 19), (118, 7)]
         phase = now * 3
         for idx, (sx, sy) in enumerate(stars):
-            blink = 0.4 + 0.6 * (0.5 + 0.5 * np.sin(phase + idx * 1.3))
+            blink = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(phase + idx * 1.3))
             col = Color(
                 int(STAR.r * blink),
                 int(STAR.g * blink),
@@ -349,7 +348,7 @@ def _lua_estrelas(c, now=0.0):
     _filled_circle(c, 18, 12, 1, Color(235, 235, 210))
     for idx, (sx, sy) in enumerate([(30,5), (25,18), (35,12), (8,22), (20,25)]):
         phase = now * 3 + idx * 1.3
-        blink = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(phase))
+        blink = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(phase))
         star_color = Color(
             int(STAR.r * blink),
             int(STAR.g * blink),
@@ -371,13 +370,15 @@ def _pensamento(c, bubbles):
         cor = Color(b, b, b, alpha)
         _filled_circle(c, int(bx), int(by), int(br + 0.5), cor)
 
-def _barras_audio(c, rms=0.0):
+def _barras_audio(c, rms=0.0, now=0.0):
+    if rms <= 0:
+        return
     bars_per_side = 4
     bar_w = 2
     gap = 1
     base_h = 3
     y = 55
-    frame = int(time.time() * 18)
+    frame = int(now * 18)
     t = (frame // 10) * 1.2
     group_w = bars_per_side * bar_w + (bars_per_side - 1) * gap
     for side, sign in [("L", -1), ("R", 1)]:
@@ -385,7 +386,7 @@ def _barras_audio(c, rms=0.0):
         start_x = cx - group_w // 2
         for i in range(bars_per_side):
             phase = t + i * 1.2 + (0.5 if side == "R" else 0)
-            wave = np.sin(phase) * 0.5 + 0.5
+            wave = math.sin(phase) * 0.5 + 0.5
             audio_influence = min(1.0, rms * 40.0)
             h = int(base_h + wave * 2 + audio_influence * 4)
             h = max(1, min(12, h))
@@ -434,8 +435,8 @@ MOUTH_Y = FY + 12
 
 def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, bubbles=None, bocejando=False, bocejo_frame=0, trans_frame=-1, trans_total=0):
     if now is None:
-        now = time.time()
-    breath_y = int(0.5 * np.sin(now * 2.1))
+        now = time.monotonic()
+    breath_y = int(0.5 * math.sin(now * 2.1))
     eye_l = FX - 16
     eye_r = FX + 16
     eye_y = FY - 10
@@ -483,7 +484,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "slight")
-        _barras_audio(c, rms=audio_rms)
+        _barras_audio(c, rms=audio_rms, now=now)
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "curiosa", t=now)
         _olho(c, eye_l, eye_y - 3, "up", rms=0.0, t=now)
@@ -496,7 +497,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
         dirs = [(-1,-2), (1,-2), (-1,2), (1,2)]
-        fdx, fdy = dirs[(int(time.time() // 3)) % 4]
+        fdx, fdy = dirs[(int(now // 3)) % 4]
         _olho(c, eye_l, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _olho(c, eye_r, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _palpebra(c, eye_l, eye_y)
@@ -523,7 +524,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
                     c.set_pixel(FX + sign * (w + 1), mouth_y + mid - 1, BOCA_COR)
         else:
             _boca_dinamica(c, FX, mouth_y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
-        _barras_audio(c, rms=audio_rms)
+        _barras_audio(c, rms=audio_rms, now=now)
     elif expressao == "triste":
         _sobrancelhas(c, "triste", t=now)
         _olho(c, eye_l, eye_y, "normal", fdy=1, rms=0.0, t=now)
@@ -559,7 +560,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
             c.set_pixel(FX + dx, mouth_y, SOBRANCELHA)
             c.set_pixel(FX + dx, mouth_y + 1, SOBRANCELHA)
         if expressao == "falando":
-            _barras_audio(c, rms=audio_rms)
+            _barras_audio(c, rms=audio_rms, now=now)
 
     if piscando == 2:
         _olho_fechado(c, eye_l, eye_y - 1)
@@ -745,6 +746,7 @@ class LuizaApp(App[None]):
     def _abrir_olhos(self):
         self._piscando = 0
         self._atualizar_rosto()
+        self._agendar_piscar()
 
     def _step_transicao(self):
         self._trans_frame += 1
@@ -829,7 +831,7 @@ class LuizaApp(App[None]):
         with canvas.batch_refresh():
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
                            self._piscando, self._olho_dir,
-                           audio_rms=self._audio_rms, now=time.time(),
+                           audio_rms=self._audio_rms, now=time.monotonic(),
                            mouth_h=self._mouth_h if self.expressao == "falando" else None,
                            bubbles=self._bubbles if self.expressao == "transcrevendo" else None,
                            bocejando=self._bocejando,
