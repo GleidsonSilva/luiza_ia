@@ -15,7 +15,7 @@ def _get_model():
     global _EMB_CACHE
     if _EMB_CACHE is None:
         from sentence_transformers import SentenceTransformer
-        _EMB_CACHE = SentenceTransformer(MODELO_EMBEDDING)
+        _EMB_CACHE = SentenceTransformer(MODELO_EMBEDDING, local_files_only=True)
     return _EMB_CACHE
 
 
