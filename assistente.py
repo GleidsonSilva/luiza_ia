@@ -90,7 +90,7 @@ Todas as chamadas de ferramenta sao INVISIVEIS para a crianca. Apos usar, contin
 CADA CRIANCA tem sua propria memoria separada. Voce precisa saber QUEM esta falando para carregar/salvar os dados certos. Quando uma crianca nova aparecer, chame `lembrar_nome` primeiro — isso faz o sistema carregar a memoria daquela crianca. Depois use `carregar_memoria` para ver os dados dela.
 
 MEMORIA (voce decide quando usar):
-1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o..."). Se for UM NOME DIFERENTE da crianca anterior, chame para trocar a crianca ativa.
+1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o..."). Se for UM NOME DIFERENTE da crianca anterior, chame para trocar a crianca ativa. Se a crianca CORRIGIR o proprio nome (ex: "nao eh Ilona, eh Eloa"), use lembrar_nome com o nome correto — o sistema atualiza a identidade existente automaticamente.
 2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, topicos, brincadeiras). Carrega tudo da CRIANCA ATIVA.
 3. salvar_memoria: quando a crianca compartilhar algo importante. Use o parametro categoria para escolher onde guardar:
    - categoria="crianca": fatos pessoais (nome, idade, cor, bichinho, brinquedo, comida, cidade)
@@ -116,6 +116,7 @@ REGRAS DE USO:
 - Cada crianca tem sua propria memoria separada
 - A memoria fica automaticamente disponivel aqui no inicio de cada conversa. Voce ja ve o que sabe sobre a crianca
 - Quando a crianca se apresentar, chame lembrar_nome — o sistema ja carrega e mostra os dados dela na resposta
+- Se a crianca CORRIGIR o proprio nome (ex: "nao eh Ilona, eh Eloa"), chame lembrar_nome com o nome correto. O sistema atualiza a identidade existente automaticamente.
 - Use carregar_memoria para ver o JSON completo se precisar de mais detalhes
 - Use salvar_memoria com o parametro categoria para guardar:
   * "crianca": nome, idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, etc.
@@ -158,7 +159,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "lembrar_nome",
-            "description": "Salva o nome da crianca e TROCA a crianca ativa. Use quando a crianca se apresentar explicitamente ('meu nome eh Maria', 'sou o Pedro'). Se for um NOME DIFERENTE da crianca que estava falando antes, chame para trocar para a crianca nova. NAO use para cumprimentos ('oi Luiza', 'e a Luiza'). NAO infira nome de contexto. Se ja tiver o MESMO nome salvo, nao use novamente.",
+            "description": "Salva o nome da crianca e TROCA a crianca ativa. Use quando a crianca se apresentar explicitamente ('meu nome eh Maria', 'sou o Pedro'). Se for um NOME DIFERENTE da crianca que estava falando antes, chame para trocar a crianca nova. NAO use para cumprimentos ('oi Luiza', 'e a Luiza'). NAO infira nome de contexto. Se ja tiver o MESMO nome salvo, nao use novamente. Se a crianca CORRIGIR o proprio nome (ex: 'nao eh Ilona, eh Eloa'), use lembrar_nome com o nome correto — o sistema atualiza a identidade existente automaticamente.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -578,14 +579,23 @@ def perguntar(texto: str) -> str:
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
-                child_id_ativo = hashlib.sha256(args["nome"].lower().strip().encode()).hexdigest()
-                mem = memoria.carregar(child_id_ativo)
-                _ = memoria.adicionar_fato(mem, "nome", args["nome"])
+                novo_nome = args["nome"].strip()
+                nome_salvo = mem.get("crianca", {}).get("nome", "")
+
+                if child_id_ativo and nome_salvo and nome_salvo.lower().strip() != novo_nome.lower().strip():
+                    mem = memoria.carregar(child_id_ativo)
+                    mem["crianca"]["nome"] = novo_nome
+                    result = f"Nome atualizado para: {novo_nome}"
+                else:
+                    child_id_ativo = hashlib.sha256(novo_nome.lower().strip().encode()).hexdigest()
+                    mem = memoria.carregar(child_id_ativo)
+                    memoria.adicionar_fato(mem, "nome", novo_nome)
+                    result = f"Nome salvo: {novo_nome}"
+
                 mem_formatada = memoria.formatar_para_prompt(mem)
-                result = f"Nome salvo: {args['nome']}"
                 if mem_formatada:
                     result += f"\n\nMemoria carregada:\n{mem_formatada}"
-                debug.log(f"tool: lembrar_nome -> nome='{args['nome']}' id={child_id_ativo[:12]}...")
+                debug.log(f"tool: lembrar_nome -> nome='{novo_nome}' id={child_id_ativo[:12]}...")
             elif name == "carregar_memoria":
                 if child_id_ativo is None:
                     result = "Nenhuma crianca ativa. Use lembrar_nome primeiro para identificar quem esta falando."
