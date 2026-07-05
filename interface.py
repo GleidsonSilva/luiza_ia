@@ -120,12 +120,13 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0, rms=0.0, t=0.0):
         if rms > 0.02:
             c.set_pixel(cx + fdx, cy - 2 + fdy, Color(120, 180, 130))
     elif estilo == "happy_talk":
-        pr = 3 + int(min(1.5, rms * 3))
+        pr = 4 + int(min(1.0, rms * 2))
         _filled_circle(c, cx + fdx, cy + fdy, pr, OLHO)
         c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
+        c.set_pixel(cx - 2 + fdx, cy - 2 + fdy, BRANCO)
         c.set_pixel(cx - 1 + fdx, cy + 1 + fdy, Color(120, 180, 130))
         if rms > 0.02:
-            c.set_pixel(cx + fdx, cy - 2 + fdy, Color(120, 180, 130))
+            c.set_pixel(cx + fdx, cy - 3 + fdy, Color(120, 180, 130))
             c.set_pixel(cx + 2 + fdx, cy + fdy, Color(120, 180, 130))
             c.set_pixel(cx - 2 + fdx, cy + fdy, Color(120, 180, 130))
     elif estilo == "focused":
@@ -229,15 +230,16 @@ def _nariz(c):
     c.set_pixel(FX - 1, FY + 2, NARIZ)
     c.set_pixel(FX, FY + 2, NARIZ)
 
-def _palpebra(c, cx, cy):
+def _palpebra(c, cx, cy, soft=False, squint=0):
+    cor = Color(210, 165, 130) if soft else SOBRANCELHA
     for ox in range(-6, 7):
         oy = (ox * ox) // 7
-        c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
-        if ox % 2 == 0:
-            c.set_pixel(cx + ox, cy - 6 + oy, Color(
-                max(0, SOBRANCELHA.r - 20),
-                max(0, SOBRANCELHA.g - 20),
-                max(0, SOBRANCELHA.b - 20)
+        c.set_pixel(cx + ox, cy - 7 + squint + oy, cor)
+        if not soft and ox % 2 == 0:
+            c.set_pixel(cx + ox, cy - 6 + squint + oy, Color(
+                max(0, cor.r - 20),
+                max(0, cor.g - 20),
+                max(0, cor.b - 20)
             ))
 
 def _olho_fechado(c, cx, cy):
@@ -506,8 +508,8 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _sobrancelhas(c, "feliz", t=now)
         _olho(c, eye_l, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
         _olho(c, eye_r, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
-        _palpebra(c, eye_l, eye_y)
-        _palpebra(c, eye_r, eye_y)
+        _palpebra(c, eye_l, eye_y, soft=True, squint=1)
+        _palpebra(c, eye_r, eye_y, soft=True, squint=1)
         _blush(c)
         _nariz(c)
         if mouth_h is not None:
