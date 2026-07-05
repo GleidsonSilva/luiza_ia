@@ -270,7 +270,7 @@ def _sobrancelha_traca(c, x1, x2, y1, y2, espessura=1):
     for x in range(x1, x2 + step, step):
         t = (x - x1) / length
         y = int(y1 + t * (y2 - y1))
-        for dy in range(-espessura, espessura + 1):
+        for dy in range(-espessura, espessura):
             c.set_pixel(x, y + dy, SOBRANCELHA)
 
 def _sobrancelhas(c, estado, t=0.0, rms=0.0):
