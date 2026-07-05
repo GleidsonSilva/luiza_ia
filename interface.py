@@ -486,12 +486,10 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "surprised")
-        if bubbles:
-            _pensamento(c, bubbles)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
         dirs = [(-1,-2), (1,-2), (-1,2), (1,2)]
-        fdx, fdy = dirs[(int(time.time() * 2)) % 4]
+        fdx, fdy = dirs[(int(time.time() // 3)) % 4]
         _olho(c, eye_l, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _olho(c, eye_r, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _palpebra(c, eye_l, eye_y)
@@ -499,8 +497,6 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "slight")
-        if bubbles:
-            _pensamento(c, bubbles)
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
         _olho(c, eye_l, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
@@ -807,7 +803,7 @@ class LuizaApp(App[None]):
         if self._bubble_frame % 5 == 0 and len(self._bubbles) < 5:
             rx = random.randint(-3, 3)
             self._bubbles.append((FX + 10 + rx, FY - 28, 1.0, 0))
-        if self.expressao in ("transcrevendo", "pensando"):
+        if self.expressao == "transcrevendo":
             self._atualizar_rosto()
 
     def _atualizar_rosto(self):
@@ -819,7 +815,7 @@ class LuizaApp(App[None]):
                            self._piscando, self._olho_dir,
                            audio_rms=self._audio_rms, now=time.time(),
                            mouth_h=self._mouth_h if self.expressao == "falando" else None,
-                           bubbles=self._bubbles if self.expressao in ("transcrevendo", "pensando") else None,
+                           bubbles=self._bubbles if self.expressao == "transcrevendo" else None,
                            bocejando=self._bocejando,
                            bocejo_frame=self._bocejo_frame if self._bocejando else 0,
                            trans_frame=self._trans_frame,
@@ -854,11 +850,15 @@ class LuizaApp(App[None]):
         if expressao == "falando":
             self._boca_delay_timer = self.set_timer(0.5, self._iniciar_animacao_boca)
             self._bubble_timer.pause()
-        elif expressao in ("transcrevendo", "pensando"):
+        elif expressao == "transcrevendo":
             self._bubbles = []
             self._bubble_frame = 0
             self._bubble_timer.resume()
             self._boca_timer.pause()
+        elif expressao == "pensando":
+            self._bubbles = []
+            self._boca_timer.pause()
+            self._bubble_timer.pause()
         else:
             self._bubbles = []
             self._boca_timer.pause()
