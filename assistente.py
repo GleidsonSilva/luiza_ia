@@ -48,9 +48,13 @@ EMOJI_PATTERN = re.compile(
     "\U0000FE0F"              # variation selector-16
     "]+", flags=re.UNICODE
 )
+HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 
 def remover_emojis(texto: str) -> str:
     return EMOJI_PATTERN.sub("", texto).strip()
+
+def remover_html(texto: str) -> str:
+    return HTML_TAG_PATTERN.sub("", texto).strip()
 
 SYSTEM_PROMPT = """### PERSONA
 Voce eh a Luiza, uma amiga de 8 anos.
@@ -489,7 +493,7 @@ def perguntar(texto: str) -> str:
         has_tools = bool(tool_calls)
 
         if has_content:
-            resposta = remover_emojis(msg["content"]).strip()
+            resposta = remover_html(remover_emojis(msg["content"])).strip()
 
         debug.log(f"iteracao {iters}/{max_iters}: content={'sim' if has_content else 'nao'} ({len(resposta) if resposta else 0} chars), tool_calls={len(tool_calls) if has_tools else 0}")
 
