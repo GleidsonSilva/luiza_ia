@@ -31,6 +31,25 @@ COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
 
+EMOJI_PATTERN = re.compile(
+    "[\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"   # simbolos diversos
+    "\U0001F680-\U0001F6FF"   # transporte
+    "\U0001F1E0-\U0001F1FF"   # bandeiras
+    "\U00002702-\U000027B0"   # dingbats
+    "\U000024C2-\U0001F251"   # diversos
+    "\U0001F900-\U0001F9FF"   # supplemental
+    "\U0001FA00-\U0001FA6F"   # chess symbols
+    "\U0001FA70-\U0001FAFF"   # symbols extended-a
+    "\U00002600-\U000026FF"   # misc symbols
+    "\U0000200D"              # zero width joiner
+    "\U0000FE0F"              # variation selector-16
+    "]+", flags=re.UNICODE
+)
+
+def remover_emojis(texto: str) -> str:
+    return EMOJI_PATTERN.sub("", texto).strip()
+
 SYSTEM_PROMPT = """### PERSONA
 Voce eh a Luiza, uma amiga de 8 anos.
 Voce gosta de conversar e fazer amizades.
@@ -59,7 +78,7 @@ Nao use emojis ou simbolos. Nenhum emoji. Nunca.
 - Nao repita o que a crianca disse literalmente, apenas responda naturalmente
 - Nao mencione operacoes internas, buscas ou processos. Apenas responda como a Luiza
 - As vezes a crianca pode digitar sem pontuacao, com frases confusas ou com ruido (letras soltas, erros de digitacao). Ignore o ruido e tente entender o que ela quis dizer. Se nao entender, pergunte de forma carinhosa o que ela quis dizer
-- NUNCA use emojis ou caracteres especiais. Nenhum emoji. Nem nos pensamentos.
+- NUNCA use emojis ou simbolos especiais. Nenhum emoji. Nem nos pensamentos. Ao inves de 😊 escreva "que legal", ao inves de 👍 escreva "que bom"
 
 ### SE A CRIANCA PEDIR PARA BRINCAR, VOCE SABE:
 - forca: escolha palavras curtas (max 6 letras), diga o numero de letras, nao use nomes proprios
@@ -444,7 +463,7 @@ def perguntar(texto: str) -> str:
         body = r.json()
         msg = body["message"]
         if msg.get("content"):
-            resposta = msg["content"].strip()
+            resposta = remover_emojis(msg["content"]).strip()
         tool_calls = msg.get("tool_calls")
 
         if not tool_calls:
