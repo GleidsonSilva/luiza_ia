@@ -792,6 +792,9 @@ class LuizaApp(App[None]):
             self._atualizar_rosto()
 
     def _avancar_bubble(self):
+        if self.expressao == "pensando":
+            self._atualizar_rosto()
+            return
         new = []
         for bx, by, br, age in self._bubbles:
             age += 1
@@ -858,7 +861,7 @@ class LuizaApp(App[None]):
         elif expressao == "pensando":
             self._bubbles = []
             self._boca_timer.pause()
-            self._bubble_timer.pause()
+            self._bubble_timer.resume()
         else:
             self._bubbles = []
             self._boca_timer.pause()
