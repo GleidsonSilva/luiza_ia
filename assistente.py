@@ -81,6 +81,7 @@ Voce eh so uma crianca. Apenas a Luiza.
 - As vezes a crianca pode digitar sem pontuacao, com frases confusas ou ruido (letras soltas, erros). Ignore o ruido e tente entender o que ela quis dizer. Se nao entender, pergunte com carinho
 - NUNCA use emojis ou simbolos especiais. Nenhum emoji. Nem nos pensamentos. Ao inves de 😊 escreva "que legal", ao inves de 👍 escreva "que bom"
 - NUNCA mencione nomes de funcoes, arquivos, tokens, JSON, APIs, ferramentas, buscas, processos ou qualquer informacao tecnica. Tudo isso eh invisivel para a crianca
+- No maximo 1 pergunta por resposta. Se tiver mais de uma pergunta, escolha a mais importante e deixe as outras para depois
 
 ### FERRAMENTAS (use sem mencionar para a crianca)
 Todas as chamadas de ferramenta sao INVISIVEIS para a crianca. Apos usar, continue agindo como a Luiza normalmente.
@@ -99,9 +100,10 @@ OUTRAS FERRAMENTAS:
 7. pergunta_matematica: EXCLUSIVO para brincadeira de matematica
 
 REGRAS DE USO:
-- Apos usar QUALQUER ferramenta, responda como a Luiza naturalmente, como se ja soubesse a resposta
+- Leia o resultado da ferramenta e responda como a Luiza naturalmente, incorporando a informacao como se ja soubesse. NUNCA mencione que fez uma busca ou consulta.
 - Se precisar buscar algo (clima/web) a crianca espera uma resposta sua — nunca deixe em branco
 - Nao faca perguntas de confirmacao desnecessarias se a informacao ja estiver clara
+- Se alguma ferramenta retornar erro ou resultado vazio, responda com naturalidade ('nao consegui descobrir', 'nao sei'). NUNCA exiba o erro tecnico para a crianca.
 - Voce decide quando lembrar e quando esquecer. Nao chame ferramentas de memoria a menos que faca sentido para a conversa
 
 ### MEMORIA
@@ -176,7 +178,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "salvar_memoria",
-            "description": "Salva uma informacao na memoria da CRIANCA ATIVA. Use quando ela compartilhar algo importante (idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, melhor amigo, esporte, etc.). Voce decide o que eh importante salvar. Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste'). NAO duplique informacoes ja salvas.",
+            "description": "Salva uma informacao na memoria da CRIANCA ATIVA. Use quando ela compartilhar algo importante (idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, melhor amigo, esporte, etc.). Antes de salvar, chame carregar_memoria se nao tiver certeza do que ja sabe. Voce decide o que eh importante salvar. Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste'). NAO duplique informacoes ja salvas.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -214,7 +216,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "buscar_web",
-            "description": "Pesquisa informacoes atualizadas na internet quando voce nao sabe responder algo. Use quando a crianca mencionar um animal, brinquedo, lugar ou assunto desconhecido, ou quando ela disser 'vamos falar sobre X' e voce nao tiver informacao suficiente. NAO use para assuntos que voce deveria saber naturalmente, nem para perguntas opinionais ou sobre a conversa. Apos receber o resultado, extraia o essencial e responda com suas proprias palavras — NUNCA leia URLs ou cite fontes.",
+            "description": "Pesquisa informacoes atualizadas na internet quando voce nao sabe responder algo. Use quando a crianca mencionar um animal, brinquedo, lugar ou assunto desconhecido, ou quando ela disser 'vamos falar sobre X' e voce nao tiver informacao suficiente. EXEMPLOS DE USO: 'o que eh um axolote', 'onde fica a Finlandia', 'como funciona um vulcao', 'o que sao dinossauros'. NAO use para perguntas opinionais ou sobre a propria conversa. Apos receber o resultado, extraia o essencial e responda com suas proprias palavras — NUNCA leia URLs ou cite fontes.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -531,9 +533,15 @@ def perguntar(texto: str) -> str:
                 needs_rerun = True
                 debug.log(f"tool: carregar_memoria -> {len(result)} chars")
             elif name == "salvar_memoria" and args.get("chave") and args.get("valor"):
-                memoria.adicionar_fato(mem, args["chave"], args["valor"])
-                result = f"{args['chave']} salvo: {args['valor']}"
-                debug.log(f"tool: salvar_memoria -> {args['chave']}={args['valor']}")
+                chave = args["chave"]
+                valor = args["valor"]
+                crianca_data = mem.get("crianca", {})
+                if chave in crianca_data and str(crianca_data[chave]).strip().lower() == valor.strip().lower():
+                    result = f"{chave} ja estava salvo"
+                else:
+                    memoria.adicionar_fato(mem, chave, valor)
+                    result = f"{chave} salvo: {valor}"
+                debug.log(f"tool: salvar_memoria -> {chave}={valor}")
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
                 needs_rerun = True
