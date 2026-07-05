@@ -198,7 +198,7 @@ def _boca_retang(c, cx, cy, w, h, inner=False, curve=True):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 7, 13, assimetrico=1)
+        _boca_curva(c, cx, cy, 6, 13)
     elif forma == "smile_wide":
         _boca_curva(c, cx, cy, 7, 15, assimetrico=1)
     elif forma == "slight":
