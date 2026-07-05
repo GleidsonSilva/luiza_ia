@@ -341,7 +341,7 @@ class LuizaApp(App[None]):
         border: solid #d0c0a8;
         color: #4a3f35;
         padding: 0 2;
-        height: 3;
+        height: 5;
         margin: 0 4;
     }
 
@@ -538,7 +538,7 @@ class LuizaApp(App[None]):
     def _processar(self, audio):
         t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
         t.start()
-        if not t.join(timeout=25.0):
+        if not t.join(timeout=60.0):
             sd.stop()
             debug.log("_processar: timeout")
             self.call_from_thread(self._atualizar_tts, "Desculpe, demorou demais")

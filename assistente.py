@@ -213,7 +213,7 @@ def compactar_historico(historico_para_resumir: list[dict]) -> str:
         r = requests.post(OLLAMA_URL, json={
             "model": MODEL, "messages": messages, "stream": False,
             "options": {"temperature": 0.3, "max_tokens": 300},
-        }, timeout=30)
+        }, timeout=60)
         body = r.json()
         return body.get("message", {}).get("content", "").strip()
     except Exception as e:
@@ -275,7 +275,7 @@ def perguntar(texto: str) -> str:
         iters += 1
         r = requests.post(OLLAMA_URL, json={
             "model": MODEL, "messages": messages, "tools": tools, "stream": False
-        }, timeout=30)
+        }, timeout=60)
         body = r.json()
         msg = body["message"]
         if msg.get("content"):
@@ -344,7 +344,7 @@ def falar(texto: str):
         parar_stream()
 
     try:
-        samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
+        samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.1, lang="pt-br")
     except Exception as e:
         debug.log(f"falar: kokoro.create falhou: {e}")
         if was_streaming:
