@@ -498,20 +498,7 @@ class LuizaApp(App[None]):
         margin-bottom: 1;
     }
 
-    .label {
-        height: 1;
-        padding: 0 3;
-        margin-top: 0;
-        color: #2b1d0e;
-        text-style: bold;
-    }
-
-    .label-luiza {
-        color: #7a1f18;
-        text-style: bold;
-    }
-
-        .bubble {
+    .bubble {
         background: #fcf0e0;
         border: solid #d0c0a8;
         color: #4a3f35;
@@ -588,8 +575,7 @@ class LuizaApp(App[None]):
     expressao = reactive("idle")
     _frame_boca = 0
     _piscando = False
-    _typing_timer = None
-    _typing_target = None
+    _typing_timers: dict[str, object] = {}
 
     def __init__(self):
         super().__init__()
@@ -609,12 +595,10 @@ class LuizaApp(App[None]):
         with Container(id="face-wrapper"):
             yield Canvas(W, H, canvas_color=WALL, id="rosto")
         yield Static(STATUS_MAP["idle"], id="status")
-        yield Static("Você:", classes="label")
         with Horizontal(classes="bubble-row"):
-            yield Static(" ", id="stt-text", classes="bubble")
-        yield Static("Luiza:", classes="label label-luiza")
+            yield Static("Você:", id="stt-text", classes="bubble")
         with Horizontal(classes="bubble-row"):
-            yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
+            yield Static("[#7a1f18]Luiza:[/]", id="tts-text", classes="bubble bubble-luiza")
         yield Static("", id="ctx-usage")
         yield Static("\[Espaço/Enter] Falar  \[Esc] Sair", id="hint")
 
@@ -692,28 +676,31 @@ class LuizaApp(App[None]):
         else:
             self._boca_timer.pause()
 
-    def _start_typing(self, widget_id, text, speed=0.04, is_error=False):
-        self._cancel_typing()
+    def _start_typing(self, widget_id, text, speed=0.04, is_error=False, label=""):
+        self._cancel_typing(widget_id)
         target = self.query_one(f"#{widget_id}", Static)
         if is_error:
             target.add_class("bubble-erro")
         else:
             target.remove_class("bubble-erro")
+        full_text = f"{label}{text}" if text else label
         idx = 0
         def _step():
             nonlocal idx
             idx += 1
-            target.update(text[:idx])
-            if idx < len(text):
-                self._typing_timer = self.set_timer(speed, _step)
+            target.update(full_text[:idx])
+            if idx < len(full_text):
+                self._typing_timers[widget_id] = self.set_timer(speed, _step)
             else:
-                self._typing_timer = None
+                self._typing_timers.pop(widget_id, None)
         _step()
 
-    def _cancel_typing(self):
-        if self._typing_timer:
-            self._typing_timer.cancel()
-            self._typing_timer = None
+    def _cancel_typing(self, widget_id=None):
+        if widget_id is None:
+            widget_id = next(iter(self._typing_timers), None)
+        if widget_id and widget_id in self._typing_timers:
+            timer = self._typing_timers.pop(widget_id)
+            timer.stop()
 
     def _iniciar_animacao_boca(self):
         self._boca_delay_timer = None
@@ -727,8 +714,8 @@ class LuizaApp(App[None]):
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
-        self._start_typing("stt-text", "")
-        self._start_typing("tts-text", "")
+        self._start_typing("stt-text", "", label="Você: ")
+        self._start_typing("tts-text", "", label="[#7a1f18]Luiza:[/] ")
 
     def _parar_gravacao(self):
         self._silencio_timer.pause()
@@ -746,6 +733,9 @@ class LuizaApp(App[None]):
         if not self.gravando:
             return
         try:
+            agora = time.monotonic()
+            if agora - self._inicio_gravacao < 1.5:
+                return
             with assistente.buf_lock:
                 recent = assistente.buf[self.recording_idx:]
             if not recent:
@@ -822,16 +812,16 @@ class LuizaApp(App[None]):
     def _atualizar_stt(self, texto):
         if texto:
             texto = re.sub(r'\s+', ' ', texto).strip()
-        self._start_typing("stt-text", texto or "")
+        self._start_typing("stt-text", texto or "", label="Você: ")
 
     def _atualizar_tts(self, texto):
         if texto:
             texto = re.sub(r'\s+', ' ', texto).strip()
-        self._start_typing("tts-text", texto or "")
+        self._start_typing("tts-text", texto or "", label="[#7a1f18]Luiza:[/] ")
 
     def _atualizar_tts_erro(self, texto):
         texto = re.sub(r'\s+', ' ', texto).strip()
-        self._start_typing("tts-text", texto, is_error=True)
+        self._start_typing("tts-text", texto, is_error=True, label="[#7a1f18]Luiza:[/] ")
 
     def _atualizar_ctx(self):
         s = assistente.ultimo_ctx_status
