@@ -448,115 +448,133 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, spinner_frame=0):
+def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, spinner_frame=0, bocejando=False, bocejo_frame=0):
     if now is None:
         now = time.time()
+    breath_y = int(0.7 * np.sin(now * 2.1))
+    tilt_x = int(0.8 * np.sin(now * 1.3))
+    fxc = FX + tilt_x
+    fyc = FY
+    eye_l = fxc - 16
+    eye_r = fxc + 16
+    eye_y = fyc - 10
+    mouth_y = fyc + 12
     c.clear()
     _tapete(c)
     _janela(c, now=now)
     _lua_estrelas(c, now=now)
     _corpo(c)
     _cabelo_atras(c)
-    _filled_oval(c, FX, FY, 36, 28, PELE)
+    _filled_oval(c, fxc, fyc + breath_y, 36, 28, PELE)
     _franja(c)
     _lacinho(c)
 
+    boca_forma = "smile"
+    if bocejando:
+        if bocejo_frame <= 8:
+            boca_forma = "open_medium"
+        elif bocejo_frame <= 16:
+            boca_forma = "open_large"
+        elif bocejo_frame <= 24:
+            boca_forma = "open_medium"
+        else:
+            boca_forma = "smile"
+
     if expressao == "idle":
-        _sobrancelhas(c, "animada", t=now)
-        _olho(c, EYE_L, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
-        _olho(c, EYE_R, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _sobrancelhas(c, "neutra", t=now)
+        _olho(c, eye_l, eye_y, "olhando", *olho_dir, rms=audio_rms, t=now)
+        _olho(c, eye_r, eye_y, "olhando", *olho_dir, rms=audio_rms, t=now)
+        if bocejando:
+            _olho_fechado(c, eye_l, eye_y)
+            _olho_fechado(c, eye_r, eye_y)
+        else:
+            _palpebra(c, eye_l, eye_y)
+            _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "smile")
+        _boca(c, fxc, mouth_y, boca_forma)
     elif expressao == "ouvindo":
         _sobrancelhas(c, "animada", t=now)
-        _olho(c, EYE_L, EYE_Y, "normal", rms=audio_rms, t=now)
-        _olho(c, EYE_R, EYE_Y, "normal", rms=audio_rms, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "normal", rms=audio_rms, t=now)
+        _olho(c, eye_r, eye_y, "normal", rms=audio_rms, t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "slight")
+        _boca(c, fxc, mouth_y, "slight")
         _vu_meter(c, rms=audio_rms)
         _barras_audio(c, rms=audio_rms)
-    elif expressao == "pensando":
-        _sobrancelhas(c, "franzida", t=now)
-        fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
-        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
-        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
-        _blush(c)
-        _nariz(c)
-        _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "curiosa", t=now)
-        _olho(c, EYE_L, EYE_Y - 3, "up", rms=0.0, t=now)
-        _olho(c, EYE_R, EYE_Y - 3, "up", rms=0.0, t=now)
-        _palpebra(c, EYE_L, EYE_Y - 3)
-        _palpebra(c, EYE_R, EYE_Y - 3)
+        _olho(c, eye_l, eye_y - 3, "up", rms=0.0, t=now)
+        _olho(c, eye_r, eye_y - 3, "up", rms=0.0, t=now)
+        _palpebra(c, eye_l, eye_y - 3)
+        _palpebra(c, eye_r, eye_y - 3)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "surprised")
+        _boca(c, fxc, mouth_y, "surprised")
         _spinner(c, spinner_frame)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
-        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
-        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
+        _olho(c, eye_r, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "slight")
+        _boca(c, fxc, mouth_y, "slight")
         _spinner(c, spinner_frame)
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
-        _olho(c, EYE_L, EYE_Y, "happy_talk", 0, 0, rms=audio_rms, t=now)
-        _olho(c, EYE_R, EYE_Y, "happy_talk", 0, 0, rms=audio_rms, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
+        _olho(c, eye_r, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
         if mouth_h is not None:
             w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
-            _boca_retang(c, FX, MOUTH_Y, w, int(mouth_h), inner=audio_rms > 0.04)
+            _boca_retang(c, fxc, mouth_y, w, int(mouth_h), inner=audio_rms > 0.04)
         else:
-            _boca_dinamica(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
+            _boca_dinamica(c, fxc, mouth_y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
         _barras_audio(c, rms=audio_rms)
     elif expressao == "triste":
         _sobrancelhas(c, "triste", t=now)
-        _olho(c, EYE_L, EYE_Y, "normal", fdy=1, rms=0.0, t=now)
-        _olho(c, EYE_R, EYE_Y, "normal", fdy=1, rms=0.0, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "normal", fdy=1, rms=0.0, t=now)
+        _olho(c, eye_r, eye_y, "normal", fdy=1, rms=0.0, t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "slight")
+        _boca(c, fxc, mouth_y, "slight")
     elif expressao == "brava":
         _sobrancelhas(c, "brava", t=now)
-        _olho(c, EYE_L, EYE_Y, "focused", fdx=-1, fdy=-1, rms=0.0, t=now)
-        _olho(c, EYE_R, EYE_Y, "focused", fdx=1, fdy=-1, rms=0.0, t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "focused", fdx=-1, fdy=-1, rms=0.0, t=now)
+        _olho(c, eye_r, eye_y, "focused", fdx=1, fdy=-1, rms=0.0, t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "slight")
+        _boca(c, fxc, mouth_y, "slight")
     elif expressao == "animada":
         _sobrancelhas(c, "animada", t=now)
-        _olho(c, EYE_L, EYE_Y, "happy", rms=max(audio_rms, 0.15), t=now)
-        _olho(c, EYE_R, EYE_Y, "happy", rms=max(audio_rms, 0.15), t=now)
-        _palpebra(c, EYE_L, EYE_Y)
-        _palpebra(c, EYE_R, EYE_Y)
+        _olho(c, eye_l, eye_y, "happy", rms=max(audio_rms, 0.15), t=now)
+        _olho(c, eye_r, eye_y, "happy", rms=max(audio_rms, 0.15), t=now)
+        _palpebra(c, eye_l, eye_y)
+        _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, MOUTH_Y, "smile")
+        _boca(c, fxc, mouth_y, "smile")
 
-    if piscando:
-        _olho_fechado(c, EYE_L, EYE_Y - 1)
-        _olho_fechado(c, EYE_R, EYE_Y - 1)
+    if piscando == 2:
+        _olho_fechado(c, eye_l, eye_y - 1)
+        _olho_fechado(c, eye_r, eye_y - 1)
+    elif piscando == 1:
+        for side_x, side_y in [(eye_l, eye_y), (eye_r, eye_y)]:
+            for ox in range(-6, 7):
+                oy = (ox * ox) // 7
+                c.set_pixel(side_x + ox, side_y + oy, SOBRANCELHA)
 
 
 class LuizaApp(App[None]):
@@ -663,7 +681,7 @@ class LuizaApp(App[None]):
 
     expressao = reactive("idle")
     _frame_boca = 0
-    _piscando = False
+    _piscando = 0
     _typing_timers: dict[str, object] = {}
 
     def __init__(self):
@@ -680,6 +698,7 @@ class LuizaApp(App[None]):
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
         self._spinner_frame = 0
+        self._bocejando = False
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -703,19 +722,61 @@ class LuizaApp(App[None]):
                                                   pause=True)
         self._agendar_piscar()
         self._agendar_olhar()
+        self._agendar_bocejo()
         self._atualizar_rosto()
 
     def _agendar_piscar(self):
         self.set_timer(random.uniform(8, 15), self._piscar)
 
     def _piscar(self):
-        self._piscando = True
+        self._piscando = 1
         self._atualizar_rosto()
-        self.set_timer(0.2, self._abrir_olhos)
+        self.set_timer(0.05, self._piscar_passo2)
+
+    def _piscar_passo2(self):
+        self._piscando = 2
+        self._atualizar_rosto()
+        self.set_timer(0.1, self._piscar_passo3)
+
+    def _piscar_passo3(self):
+        self._piscando = 1
+        self._atualizar_rosto()
+        self.set_timer(0.05, self._abrir_olhos)
 
     def _abrir_olhos(self):
-        self._piscando = False
+        self._piscando = 0
         self._atualizar_rosto()
+
+    def _agendar_bocejo(self):
+        self.set_timer(random.uniform(25, 40), self._iniciar_bocejo)
+
+    def _iniciar_bocejo(self):
+        if self.expressao != "idle":
+            self._agendar_bocejo()
+            return
+        self._bocejando = True
+        self._bocejo_frame = 0
+        self._bocejo_timer = self.set_interval(1 / 18, self._avancar_bocejo)
+
+    def _avancar_bocejo(self):
+        if self.expressao != "idle":
+            self._bocejando = False
+            self._bocejo_timer.stop()
+            self._bocejo_timer = None
+            return
+        self._bocejo_frame += 1
+        if self._bocejo_frame <= 8:
+            self._atualizar_rosto()
+        elif self._bocejo_frame <= 24:
+            self._atualizar_rosto()
+        elif self._bocejo_frame <= 32:
+            self._atualizar_rosto()
+        else:
+            self._bocejando = False
+            self._bocejo_timer.stop()
+            self._bocejo_timer = None
+            self._atualizar_rosto()
+            self._agendar_bocejo()
 
     DIRECOES = [(0,0), (-2,0), (2,0), (0,-2), (0,1),
                 (-2,-1), (2,-1), (-2,1), (2,1)]
@@ -751,7 +812,9 @@ class LuizaApp(App[None]):
                            self._piscando, self._olho_dir,
                            audio_rms=self._audio_rms, now=time.time(),
                            mouth_h=self._mouth_h if self.expressao == "falando" else None,
-                           spinner_frame=self._spinner_frame)
+                           spinner_frame=self._spinner_frame,
+                           bocejando=self._bocejando,
+                           bocejo_frame=self._bocejo_frame if self._bocejando else 0)
 
     def _mudar_expressao(self, expressao):
         if self._boca_delay_timer:
@@ -761,6 +824,11 @@ class LuizaApp(App[None]):
         self._frame_boca = 0
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
+        if self._bocejando:
+            self._bocejando = False
+            if self._bocejo_timer:
+                self._bocejo_timer.stop()
+                self._bocejo_timer = None
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
         status.update(STATUS_MAP.get(expressao, ""))
