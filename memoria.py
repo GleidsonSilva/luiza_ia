@@ -4,8 +4,14 @@ MEMORIA_PATH = "memoria.json"
 
 def carregar() -> dict:
     if os.path.exists(MEMORIA_PATH):
-        with open(MEMORIA_PATH) as f:
-            return json.load(f)
+        try:
+            with open(MEMORIA_PATH) as f:
+                conteudo = f.read().strip()
+                if not conteudo:
+                    raise ValueError("arquivo vazio")
+                return json.loads(conteudo)
+        except Exception:
+            pass
     return {"crianca": {}, "topicos": [], "ultimos_temas": [], "historico_jogos": []}
 
 def salvar(mem: dict):

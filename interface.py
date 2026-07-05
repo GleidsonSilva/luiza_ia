@@ -538,19 +538,22 @@ class LuizaApp(App[None]):
     def _processar(self, audio):
         t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
         t.start()
-        if not t.join(timeout=60.0):
+        if not t.join(timeout=180.0):
             sd.stop()
             debug.log("_processar: timeout")
-            self.call_from_thread(self._atualizar_tts, "Desculpe, demorou demais")
-            t.join(timeout=5.0)
+            try:
+                t.join(timeout=5.0)
+            except Exception:
+                pass
             self.processando = False
             self.call_from_thread(self._voltar_idle)
 
     def _processar_impl(self, audio):
+        t0_total = time.time()
         try:
             debug.log(f"_processar: audio shape={audio.shape}")
             texto = assistente.transcrever(audio)
-            debug.log(f"_processar: texto='{texto}'")
+            debug.log(f"_processar: stt={time.time()-t0_total:.2f}s texto='{texto}'")
             if not texto:
                 self.call_from_thread(self._voltar_idle)
                 return
@@ -559,14 +562,16 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._mudar_expressao, "pensando")
 
             debug.log("chamando perguntar...")
+            t1 = time.time()
             resposta = assistente.perguntar(texto)
-            debug.log(f"resposta='{resposta}'")
+            debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
 
             assistente.falar(resposta)
+            debug.log(f"_processar: fim={time.time()-t0_total:.2f}s")
         except Exception as e:
             import traceback
             import io

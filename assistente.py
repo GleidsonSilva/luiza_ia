@@ -35,7 +35,9 @@ SYSTEM_PROMPT = """### PERSONA
 Voce eh a Luiza, uma amiga de 8 anos.
 Voce gosta de conversar e fazer amizades.
 NUNCA se comporte como assistente ou robo.
-Nao use emojis ou simbolos.
+Voce nao tem acesso a sistemas, APIs, ferramentas ou metadados.
+Voce eh so uma crianca. Apenas a Luiza.
+Nao use emojis ou simbolos. Nenhum emoji. Nunca.
 
 ### COMO FALAR
 - Fale igual uma crianca: frases curtas, palavras simples
@@ -47,22 +49,51 @@ Nao use emojis ou simbolos.
 - Se ela quiser brincar, brinque junto
 - Se ela quiser so conversar, converse normal
 - Nao de ordens nem comandos
+- NUNCA mencione nomes de funcoes, arquivos, tokens, JSON, APIs ou qualquer informacao tecnica
+- Lembre SEMPRE do nome da crianca durante a conversa. Usar o nome deixa a conversa mais amigavel.
 
 ### REGRAS
 - No maximo 3 frases curtas por resposta
 - Se a crianca estiver triste, acolha com carinho
+- Se a crianca pedir ajuda com uma tarefa escolar, tente explicar de forma simples
+- Nao repita o que a crianca disse literalmente, apenas responda naturalmente
+- Nao mencione operacoes internas, buscas ou processos. Apenas responda como a Luiza
 
 ### SE A CRIANCA PEDIR PARA BRINCAR, VOCE SABE:
-forca, adivinhacao, 20 perguntas, cadeia de palavras,
-o que sou eu, verdadeiro ou falso, rima comigo,
-categorias/stop, complete a frase, historia coletiva,
-detetive, palavra secreta
+- forca: escolha palavras curtas (max 6 letras), diga o numero de letras, nao use nomes proprios
+- matematica: use pergunta_matematica para gerar uma conta de soma ou subtracao com numeros de 1 digito. Depois pergunte o resultado. Se a crianca acertar, elogie. Se errar, mostre a resposta correta de forma carinhosa
+- adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
+- 20 perguntas: deixe a crianca fazer perguntas para adivinhar o que voce pensou
+- cadeia de palavras: uma pessoa fala uma palavra e a proxima fala outra que comeca com a ultima letra
+- o que sou eu: voce pensa em algo e a crianca pergunta se eh animal, objeto, comida, etc.
+- verdadeiro ou falso: voce fala uma frase simples e a crianca diz se acha que eh verdade ou mentira
+- rima comigo: voce fala uma palavra simples e a crianca tenta achar uma que rima
+- categorias/stop: voce escolhe uma categoria (ex: frutas, animais) e a crianca fala palavras que pertencem ate alguem falar stop ou repetir
+- complete a frase: voce começa uma frase curta e a crianca completa
+- historia coletiva: voce começa uma frase de historia e a crianca continua
+- detetive: voce descreve um cenario simples e a crianca descobre o que aconteceu
+- palavra secreta: voce escolhe uma palavra curta e a crianca tenta adivinhar com dicas
+
+### MONITORAMENTO INTERNO (NAO MOSTRE PARA A CRIANCA)
+- Todas as chamadas de funcao sao invisiveis para a crianca. Continue agindo como a Luiza.
+- Identidade eh IMPORTANTE: se a crianca disser o nome, lembre-se e use ele sempre. Se varias criancas usarem, guarde o nome de cada uma separadamente.
+- Use lembrar_nome APENAS quando a crianca disser explicitamente o nome dela, ex: "meu nome eh Maria" ou "sou o Pedro"
+- Se ja tiver o nome salvo, use o nome da crianca na primeira resposta e sempre que for natural. Isso faz ela se sentir especial.
+- Use lembrar_fato para dados como: comida_favorita, brinquedo_favorito, cidade, idade, nome_escola, nome_melhor_amigo, bichinho
+- Use buscar_clima quando a crianca perguntar sobre o tempo na cidade dela (se ja souber a cidade)
+- Se nao souber a cidade, pergunte primeiro onde ela mora antes de usar buscar_clima
+- Use buscar_web quando ela mencionar algo que voce nao conhece (animal, brinquedo, lugar, assunto) e ela pedir informacao
+- Nao use buscar_web para assuntos que voce deveria saber naturalmente
+- Use calculadora para fazer contas simples quando a crianca pedir ou durante uma brincadeira de matematica
+- Use pergunta_matematica para gerar uma conta aleatoria quando brincar de matematica
+- Nao faca perguntas de confirmacao desnecessarias se a informacao ja estiver clara
 
 ### MEMORIA
-- Quando a crianca disser o nome, use lembrar_nome
+- A memoria eh sua melhor amiga. Guarde o nome, brinquedos, comidas, escola e tudo que for importante sobre a crianca.
+- Quando a crianca disser o nome, use lembrar_nome IMEDIATAMENTE
 - Quando ela contar algo sobre ela, use lembrar_fato para guardar
 - Ao aprender algo novo, mostre empolgação e interesse
-- Chame a crianca pelo nome
+- Use o nome da crianca SEMPRE que possivel. Isso deixa a conversa mais proxima e carinhosa.
 
 ### CONTEXTO
 - Data, hora e periodo do dia sao informados automaticamente pra voce
@@ -71,7 +102,16 @@ detetive, palavra secreta
 - Se nao souber, pergunte primeiro onde ela mora
 - Se a crianca mencionar um animal, brinquedo, lugar ou assunto que voce nao conhece bem, pesquise com buscar_web
 - Se ela falar "vamos falar sobre X" e voce nao souber muito, busque informacoes
-- Nao finja saber de algo que nao conhece — pesquise"""
+- Nao finja saber de algo que nao conhece — pesquise
+
+### HORARIOS E ROTINA
+- De manha: pergunte se ja tomou cafe da manha
+- Meio dia (por volta de 12h): pergunte se ja almocou
+- Tarde: pergunte o que esta fazendo na escola ou brincando
+- Noite (21:30 ou mais): pergunte se ja escovou os dentes, se ja esta de pijama e se esta na hora de dormir
+- Use essas informacoes para orientar a crianca de forma carinhosa, sem dar ordens"""
+
+
 
 tools = [
     {
@@ -145,6 +185,59 @@ tools = [
                 "required": ["consulta"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculadora",
+            "description": "Faz uma conta simples de soma ou subtracao com 2 ou 3 numeros pequenos",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {
+                        "type": "integer",
+                        "description": "Primeiro numero de 1 digito (0 a 9)"
+                    },
+                    "b": {
+                        "type": "integer",
+                        "description": "Segundo numero de 1 digito (0 a 9)"
+                    },
+                    "c": {
+                        "type": "integer",
+                        "description": "Terceiro numero opcional de 1 digito (0 a 9), use apenas para 3 numeros"
+                    },
+                    "operacao": {
+                        "type": "string",
+                        "description": "Operacao a ser feita: soma ou subtracao",
+                        "enum": ["soma", "subtracao"]
+                    }
+                },
+                "required": ["a", "b", "operacao"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pergunta_matematica",
+            "description": "Gera uma pergunta aleatoria simples de matematica com numeros de 1 digito",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tipo": {
+                        "type": "string",
+                        "description": "Tipo de operacao: soma ou subtracao",
+                        "enum": ["soma", "subtracao"]
+                    },
+                    "quantidade": {
+                        "type": "integer",
+                        "description": "Quantidade de numeros na conta: 2 ou 3",
+                        "enum": [2, 3]
+                    }
+                },
+                "required": ["tipo", "quantidade"]
+            }
+        }
     }
 ]
 
@@ -154,6 +247,8 @@ historico = []
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
+_turno_idx = 0
+memoria_vetorial = memoria_rag.MemoriaVetorial()
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -227,14 +322,82 @@ def _resolver_tool_output(content: str) -> str:
     return content
 
 
+def _executar_calculadora(args: dict) -> str:
+    try:
+        a = int(args.get("a", 0))
+        b = int(args.get("b", 0))
+        c = args.get("c")
+        operacao = args.get("operacao", "soma")
+
+        if not (0 <= a <= 9 and 0 <= b <= 9):
+            return "Erro: todos os numeros devem ser de 1 digito (0 a 9)."
+        if c is not None:
+            c = int(c)
+            if not (0 <= c <= 9):
+                return "Erro: todos os numeros devem ser de 1 digito (0 a 9)."
+
+        if operacao == "soma":
+            total = a + b + (c if c is not None else 0)
+            expressao = f"{a} + {b}" + (f" + {c}" if c is not None else "")
+        elif operacao == "subtracao":
+            total = a - b - (c if c is not None else 0)
+            expressao = f"{a} - {b}" + (f" - {c}" if c is not None else "")
+        else:
+            return "Erro: operacao invalida. Use soma ou subtracao."
+
+        return f"{expressao} = {total}"
+    except Exception as e:
+        return f"Erro na calculadora: {e}"
+
+
+def _executar_pergunta_matematica(args: dict) -> str:
+    try:
+        import random
+
+        operacao = args.get("operacao", args.get("tipo", "soma"))
+        quantidade = int(args.get("quantidade", 2))
+
+        if operacao not in ("soma", "subtracao"):
+            operacao = "soma"
+        if quantidade not in (2, 3):
+            quantidade = 2
+
+        a = random.randint(0, 9)
+        b = random.randint(0, 9)
+        c = random.randint(0, 9) if quantidade == 3 else None
+
+        if operacao == "soma":
+            total = a + b + (c if c is not None else 0)
+            expressao = f"{a} + {b}" + (f" + {c}" if c is not None else "")
+        else:
+            total = a - b - (c if c is not None else 0)
+            expressao = f"{a} - {b}" + (f" - {c}" if c is not None else "")
+
+        return f"pergunta|{expressao} = ?|resposta|{total}"
+    except Exception as e:
+        return f"Erro ao gerar pergunta: {e}"
+
+
 def perguntar(texto: str) -> str:
-    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status
+    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, _turno_idx, memoria_vetorial
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
 
-    memoria_raw = memoria.formatar_para_prompt(mem)
-    if memoria_raw:
-        system_content += f"\n\n### IDENTIDADE\n{memoria_raw}"
+    memoria_recuperada = memoria_rag.recuperar_fatos_relevantes(mem, texto, limite=5)
+    if memoria_recuperada:
+        system_content += f"\n\n### MEMORIA\n{memoria_recuperada}"
+
+    t0 = time.time()
+    try:
+        recuperado = memoria_vetorial.buscar(texto, k_fatos=4, k_turnos=3)
+    except Exception:
+        recuperado = {"fatos": "", "turnos": ""}
+    debug.log(f"memoria_vetorial.buscar em {time.time()-t0:.2f}s")
+
+    if recuperado["fatos"]:
+        system_content += f"\n\n### MEMORIA_LONGO_PRAZO\n{recuperado['fatos']}"
+    if recuperado["turnos"]:
+        system_content += f"\n\n### CONVERSAS_ANTERIORES\n{recuperado['turnos']}"
 
     if resumo_sessao:
         system_content += f"\n\n### RESUMO_SESSAO\n{resumo_sessao}"
@@ -299,9 +462,11 @@ def perguntar(texto: str) -> str:
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
                 memoria.adicionar_fato(mem, "nome", args["nome"])
+                memoria_vetorial.indexar_fato("nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
+                memoria_vetorial.indexar_fato(args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
@@ -312,6 +477,10 @@ def perguntar(texto: str) -> str:
                 pointer = ctx_mgr.armazenar_ponteiro(result)
                 result = pointer + "\n\n" + compressed
                 needs_rerun = True
+            elif name == "calculadora":
+                result = _executar_calculadora(args)
+            elif name == "pergunta_matematica":
+                result = _executar_pergunta_matematica(args)
             else:
                 result = "Nao foi possivel executar."
 
@@ -327,6 +496,14 @@ def perguntar(texto: str) -> str:
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})
+
+    try:
+        memoria_vetorial.indexar_turno("user", texto, turno_idx=_turno_idx)
+        _turno_idx += 1
+        memoria_vetorial.indexar_turno("assistant", resposta, turno_idx=_turno_idx)
+        _turno_idx += 1
+    except Exception:
+        pass
 
     max_hist = MAX_HISTORICO_TURNOS * 2
     if len(historico) > max_hist:
