@@ -666,7 +666,7 @@ class LuizaApp(App[None]):
             self._ultimo_toggle = agora
             self._inicio_gravacao = agora
             self._iniciar_gravacao()
-        elif agora - self._inicio_gravacao >= 2.0:
+        elif agora - self._inicio_gravacao >= 3.5:
             self._parar_gravacao()
 
     expressao = reactive("idle")
@@ -927,13 +927,18 @@ class LuizaApp(App[None]):
         self._mudar_expressao("transcrevendo")
         with assistente.buf_lock:
             chunks = assistente.buf[self.recording_idx:]
-            if not chunks:
-                debug.log("_parar_gravacao: buf vazio, abortando")
-                self.processando = False
-                self.recording_idx = 0
-                self._mudar_expressao("idle")
-                return
-            audio = np.concatenate(chunks)
+        if not chunks:
+            time.sleep(0.5)
+            with assistente.buf_lock:
+                chunks = assistente.buf[self.recording_idx:]
+        if not chunks:
+            debug.log("_parar_gravacao: buf vazio, abortando")
+            self.processando = False
+            self.recording_idx = 0
+            self._mudar_expressao("idle")
+            return
+        audio = np.concatenate(chunks)
+        with assistente.buf_lock:
             del assistente.buf[:self.recording_idx]
             self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),

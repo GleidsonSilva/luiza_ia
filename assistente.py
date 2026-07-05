@@ -619,12 +619,17 @@ stream = None
 nome_crianca = ""
 
 
+def _stream_callback(indata, frames, time, status):
+    with buf_lock:
+        buf.append(indata.copy())
+
+
 def iniciar_stream():
     global stream, buf, nome_crianca
     nome_crianca = mem.get("crianca", {}).get("nome", "")
     buf = []
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
-                            callback=lambda i, f, t, s: buf.append(i.copy()))
+                            callback=_stream_callback)
     stream.start()
 
 
