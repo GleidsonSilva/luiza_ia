@@ -90,8 +90,12 @@ CADA CRIANCA tem sua propria memoria separada. Voce precisa saber QUEM esta fala
 
 MEMORIA (voce decide quando usar):
 1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o..."). Se for UM NOME DIFERENTE da crianca anterior, chame para trocar a crianca ativa.
-2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, etc.). Carrega a memoria da CRIANCA ATIVA.
-3. salvar_memoria: quando a crianca compartilhar algo importante sobre ela mesma. Salva na memoria da CRIANCA ATIVA. Voce decide o que eh importante guardar.
+2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, topicos, brincadeiras). Carrega tudo da CRIANCA ATIVA.
+3. salvar_memoria: quando a crianca compartilhar algo importante. Use o parametro categoria para escolher onde guardar:
+   - categoria="crianca": fatos pessoais (nome, idade, cor, bichinho, brinquedo, comida, cidade)
+   - categoria="topico": assuntos que interessam a crianca ("dinossauros", "futebol", "filmes")
+   - categoria="jogo": brincadeiras que fizeram ("forca", "matematica", "adivinhacao")
+   - categoria="tema": conversas recentes ("fim de semana", "viagem", "escola")
 
 OUTRAS FERRAMENTAS:
 4. buscar_clima: quando pergunta sobre o tempo e voce sabe a cidade
@@ -107,14 +111,17 @@ REGRAS DE USO:
 - Voce decide quando lembrar e quando esquecer. Nao chame ferramentas de memoria a menos que faca sentido para a conversa
 
 ### MEMORIA
-- Cada crianca tem sua propria memoria separada. Ao salvar ou carregar, voce acessa os dados da crianca que esta falando agora.
-- Voce tem controle total sobre o que guardar e quando consultar
-- Quando uma crianca nova aparecer, chame primeiro lembrar_nome (isso ativa o perfil dela), depois carregar_memoria para ver os dados dela
-- Use carregar_memoria para ver tudo que ja sabe sobre a crianca ativa
-- Use salvar_memoria para guardar informacoes importantes que ela compartilhar
-- Guarde nome, brinquedos, comidas, escola, cidade e tudo que parecer importante
-- Use o nome da crianca SEMPRE que possivel
+- Cada crianca tem sua propria memoria separada
+- A memoria fica automaticamente disponivel aqui no inicio de cada conversa. Voce ja ve o que sabe sobre a crianca
+- Quando a crianca se apresentar, chame lembrar_nome — o sistema ja carrega e mostra os dados dela na resposta
+- Use carregar_memoria para ver o JSON completo se precisar de mais detalhes
+- Use salvar_memoria com o parametro categoria para guardar:
+  * "crianca": nome, idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, etc.
+  * "topico": assuntos que interessam a crianca e podem render conversa
+  * "jogo": brincadeiras que ja fizeram juntos
+  * "tema": ultimos assuntos que conversaram
 - Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste')
+- Use o nome da crianca SEMPRE que possivel
 
 ### BRINCADEIRAS (se a crianca pedir)
 - forca: palavras curtas (max 6 letras), diga o numero de letras, sem nomes proprios
@@ -178,20 +185,25 @@ tools = [
         "type": "function",
         "function": {
             "name": "salvar_memoria",
-            "description": "Salva uma informacao na memoria da CRIANCA ATIVA. Use quando ela compartilhar algo importante (idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, melhor amigo, esporte, etc.). Antes de salvar, chame carregar_memoria se nao tiver certeza do que ja sabe. Voce decide o que eh importante salvar. Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste'). NAO duplique informacoes ja salvas.",
+            "description": "Salva uma informacao na memoria da CRIANCA ATIVA. A categoria define onde guardar: 'crianca' para fatos pessoais (nome, idade, cor), 'topico' para assuntos de interesse da crianca, 'jogo' para brincadeiras feitas juntos, 'tema' para conversas recentes. Nao salve respostas curtas nem opinioes momentaneas.",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "categoria": {
+                        "type": "string",
+                        "description": "Onde guardar: 'crianca' (fatos pessoais), 'topico' (assuntos), 'jogo' (brincadeiras), 'tema' (conversas recentes). Padrao: 'crianca'.",
+                        "enum": ["crianca", "topico", "jogo", "tema"]
+                    },
                     "chave": {
                         "type": "string",
-                        "description": "Tipo da informacao (ex: nome, idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita, cidade, escola, melhor_amigo, esporte)"
+                        "description": "Tipo da informacao (ex: nome, idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita, cidade, escola, melhor_amigo, esporte). Obrigatorio apenas quando categoria='crianca'."
                     },
                     "valor": {
                         "type": "string",
-                        "description": "O que a crianca disse"
+                        "description": "O que guardar: o fato, topico, jogo ou tema mencionado pela crianca"
                     }
                 },
-                "required": ["chave", "valor"]
+                "required": ["categoria", "valor"]
             }
         }
     },
@@ -520,28 +532,57 @@ def perguntar(texto: str) -> str:
             if tool_status_callback:
                 tool_status_callback(name)
 
+            NORMALIZAR_CHAVE = {
+                "cor": "cor_favorita", "cor predileta": "cor_favorita",
+                "bicho": "bichinho", "bicho de estimacao": "bichinho", "pet": "bichinho", "animal": "bichinho",
+                "brinquedo": "brinquedo_favorito", "brinquedo preferido": "brinquedo_favorito",
+                "comida": "comida_favorita", "comida preferida": "comida_favorita",
+                "cidade": "cidade", "mora em": "cidade", "onde mora": "cidade",
+                "escola": "escola", "estuda em": "escola", "onde estuda": "escola",
+                "esporte": "esporte", "esporte favorito": "esporte", "pratica": "esporte",
+            }
+
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
                 child_id_ativo = hashlib.sha256(args["nome"].lower().strip().encode()).hexdigest()
                 mem = memoria.carregar(child_id_ativo)
-                memoria.adicionar_fato(mem, "nome", args["nome"])
+                _ = memoria.adicionar_fato(mem, "nome", args["nome"])
+                mem_formatada = memoria.formatar_para_prompt(mem)
                 result = f"Nome salvo: {args['nome']}"
+                if mem_formatada:
+                    result += f"\n\nMemoria carregada:\n{mem_formatada}"
                 debug.log(f"tool: lembrar_nome -> nome='{args['nome']}' id={child_id_ativo[:12]}...")
             elif name == "carregar_memoria":
-                result = memoria.carregar_tudo(child_id_ativo)
-                needs_rerun = True
-                debug.log(f"tool: carregar_memoria -> {len(result)} chars")
-            elif name == "salvar_memoria" and args.get("chave") and args.get("valor"):
-                chave = args["chave"]
-                valor = args["valor"]
-                crianca_data = mem.get("crianca", {})
-                if chave in crianca_data and str(crianca_data[chave]).strip().lower() == valor.strip().lower():
-                    result = f"{chave} ja estava salvo"
+                if child_id_ativo is None:
+                    result = "Nenhuma crianca ativa. Use lembrar_nome primeiro para identificar quem esta falando."
                 else:
-                    memoria.adicionar_fato(mem, chave, valor)
-                    result = f"{chave} salvo: {valor}"
-                debug.log(f"tool: salvar_memoria -> {chave}={valor}")
+                    result = memoria.carregar_tudo(child_id_ativo)
+                    needs_rerun = True
+                debug.log(f"tool: carregar_memoria -> {len(result)} chars")
+            elif name == "salvar_memoria":
+                categoria = args.get("categoria", "crianca")
+                if categoria not in ("crianca", "topico", "jogo", "tema"):
+                    result = "Categoria invalida. Use: 'crianca', 'topico', 'jogo' ou 'tema'."
+                elif categoria == "crianca" and not args.get("chave"):
+                    result = "Para salvar fatos da crianca, preciso da 'chave' (ex: idade, cor_favorita) e do 'valor'."
+                elif not args.get("valor"):
+                    result = f"Preciso do 'valor' para guardar o {categoria}."
+                else:
+                    chave = args.get("chave", "")
+                    valor = args["valor"]
+                    if categoria == "crianca":
+                        chave = NORMALIZAR_CHAVE.get(chave, chave)
+                        crianca_data = mem.get("crianca", {})
+                        if chave in crianca_data and str(crianca_data[chave]).strip().lower() == valor.strip().lower():
+                            result = f"{chave} ja estava salvo"
+                        else:
+                            mem, valor_salvo = memoria.adicionar_fato(mem, chave, valor, categoria)
+                            result = f"{chave} salvo: {valor_salvo}"
+                    else:
+                        mem, valor_salvo = memoria.adicionar_fato(mem, "", valor, categoria)
+                        result = f"{categoria} salvo: {valor_salvo}"
+                debug.log(f"tool: salvar_memoria -> cat={categoria} chave='{args.get('chave','')}' valor='{args.get('valor','')}'")
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
                 needs_rerun = True
@@ -551,6 +592,12 @@ def perguntar(texto: str) -> str:
                 result = ctx_mgr.comprimir_tool_output("buscar_web", result)
                 needs_rerun = True
                 debug.log(f"tool: buscar_web consulta='{args['consulta']}' -> {len(result)} chars")
+            elif name == "buscar_clima":
+                result = "Preciso do nome da cidade no parametro 'cidade'."
+            elif name == "buscar_web":
+                result = "Preciso do que pesquisar no parametro 'consulta'."
+            elif name == "lembrar_nome":
+                result = "Preciso do nome da crianca no parametro 'nome'."
             elif name == "calculadora":
                 result = _executar_calculadora(args)
                 debug.log(f"tool: calculadora -> {result}")
@@ -558,7 +605,7 @@ def perguntar(texto: str) -> str:
                 result = _executar_pergunta_matematica(args)
                 debug.log(f"tool: pergunta_matematica -> {result}")
             else:
-                result = "Nao foi possivel executar."
+                result = "Nao conheco essa ferramenta."
                 debug.log(f"tool: desconhecida '{name}'")
 
             messages.append({"role": "tool", "content": result, "name": name})

@@ -63,6 +63,9 @@ def formatar_para_prompt(mem: dict) -> str:
     extras = [f"{k}: {v}" for k, v in c.items() if k not in ("nome", "idade", "cor_favorita", "bichinho", "brinquedo_favorito")]
     if extras:
         partes.extend(extras)
+    if mem.get("topicos"):
+        topicos = ", ".join(mem["topicos"][-5:])
+        partes.append(f"Assuntos que interessam a crianca: {topicos}.")
     if mem.get("ultimos_temas"):
         temas = ", ".join(mem["ultimos_temas"][-3:])
         partes.append(f"Ultimamente voces conversaram sobre: {temas}.")
@@ -72,9 +75,17 @@ def formatar_para_prompt(mem: dict) -> str:
     return " ".join(partes) if partes else ""
 
 
-def adicionar_fato(mem: dict, chave: str, valor: str) -> dict:
-    mem["crianca"][chave] = valor.strip().capitalize()
-    return mem
+def adicionar_fato(mem: dict, chave: str, valor: str, categoria: str = "crianca") -> tuple[dict, str]:
+    valor_final = valor.strip().capitalize()
+    if categoria == "crianca":
+        mem["crianca"][chave] = valor_final
+    elif categoria == "topico":
+        mem.setdefault("topicos", []).append(valor_final)
+    elif categoria == "jogo":
+        mem.setdefault("historico_jogos", []).append(valor_final)
+    elif categoria == "tema":
+        mem.setdefault("ultimos_temas", []).append(valor_final)
+    return mem, valor_final
 
 
 def carregar_tudo(child_id: Optional[str] = None) -> str:
