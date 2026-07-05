@@ -118,6 +118,15 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0, rms=0.0, t=0.0):
         c.set_pixel(cx - 1 + fdx, cy + 1 + fdy, Color(120, 180, 130))
         if rms > 0.02:
             c.set_pixel(cx + fdx, cy - 2 + fdy, Color(120, 180, 130))
+    elif estilo == "happy_talk":
+        pr = 3 + int(min(1.5, rms * 3))
+        _filled_circle(c, cx + fdx, cy + fdy, pr, OLHO)
+        c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
+        c.set_pixel(cx - 1 + fdx, cy + 1 + fdy, Color(120, 180, 130))
+        if rms > 0.02:
+            c.set_pixel(cx + fdx, cy - 2 + fdy, Color(120, 180, 130))
+            c.set_pixel(cx + 2 + fdx, cy + fdy, Color(120, 180, 130))
+            c.set_pixel(cx - 2 + fdx, cy + fdy, Color(120, 180, 130))
     elif estilo == "focused":
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
         c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
@@ -256,10 +265,20 @@ def _sobrancelhas(c, estado, t=0.0, rms=0.0):
     elif estado == "brava":
         _sobrancelha_traca(c, FX - 24, FX - 10, sy - 4, sy, 1)
         _sobrancelha_traca(c, FX + 10, FX + 24, sy, sy - 4, 1)
-    elif estado == "animada":
-        oy_anim = int(2 * np.sin(t * 2.5))
-        _sobrancelha_traca(c, FX - 23, FX - 9, sy - 3 + oy_anim, sy - 1 + oy_anim, 1)
-        _sobrancelha_traca(c, FX + 9, FX + 23, sy - 1 - oy_anim, sy - 3 - oy_anim, 1)
+    elif estado == "feliz":
+        oy_anim = int(1.5 * np.sin(t * 2.5))
+        for side, sign in [(FX - 16, -1), (FX + 16, 1)]:
+            for x in range(side - 7, side + 8):
+                base_y = (sy - 4)
+                oy = ((x - side) ** 2) // 20
+                c.set_pixel(x, base_y + oy + oy_anim, SOBRANCELHA)
+                c.set_pixel(x, base_y + oy + 1 + oy_anim, SOBRANCELHA)
+                if abs(x - side) > 4:
+                    c.set_pixel(x, base_y + oy - 1 + oy_anim, Color(
+                        max(0, SOBRANCELHA.r - 20),
+                        max(0, SOBRANCELHA.g - 20),
+                        max(0, SOBRANCELHA.b - 20)
+                    ))
 
 def _tapete(c):
     _filled_oval(c, FX, 67, 30, 4, RUG)
@@ -394,7 +413,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
     _lacinho(c)
 
     if expressao == "idle":
-        _sobrancelhas(c, "neutra", t=now)
+        _sobrancelhas(c, "animada", t=now)
         _olho(c, EYE_L, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
         _olho(c, EYE_R, EYE_Y, "olhando", *olho_dir, rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
@@ -402,7 +421,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _blush(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
-        _sobrancelhas(c, "neutra", t=now)
+        _sobrancelhas(c, "animada", t=now)
         _olho(c, EYE_L, EYE_Y, "normal", rms=audio_rms, t=now)
         _olho(c, EYE_R, EYE_Y, "normal", rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
@@ -428,9 +447,9 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _blush(c)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
-        _sobrancelhas(c, "neutra", t=now)
-        _olho(c, EYE_L, EYE_Y, "happy", rms=audio_rms, t=now)
-        _olho(c, EYE_R, EYE_Y, "happy", rms=audio_rms, t=now)
+        _sobrancelhas(c, "feliz", t=now)
+        _olho(c, EYE_L, EYE_Y, "happy_talk", 0, 0, rms=audio_rms, t=now)
+        _olho(c, EYE_R, EYE_Y, "happy_talk", 0, 0, rms=audio_rms, t=now)
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
