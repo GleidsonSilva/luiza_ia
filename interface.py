@@ -73,11 +73,11 @@ MOUTH_CYCLE = ["smile", "slight", "slight", "open_small", "open_small",
                "open_medium", "open_large", "open_medium", "open_small",
                "open_small", "slight", "slight"]
 STATUS_MAP = {
-    "idle":          "[#555]⬤ Pronta[/]",
-    "ouvindo":       "[#4CAF50]⬤ Ouvindo...[/]",
-    "transcrevendo": "[#FFC107]⬤ Entendendo...[/]",
-    "pensando":      "[#2196F3]⬤ Pensando...[/]",
-    "falando":       "[#9C27B0]⬤ Falando...[/]",
+    "idle":          "[#555]😊 Pronta[/]",
+    "ouvindo":       "[#4CAF50]🎤 Ouvindo...[/]",
+    "transcrevendo": "[#FFC107]🤔 Entendendo...[/]",
+    "pensando":      "[#2196F3]💭 Pensando...[/]",
+    "falando":       "[#9C27B0]🗣️ Falando...[/]",
 }
 
 def _filled_oval(c, cx, cy, rx, ry, color):
