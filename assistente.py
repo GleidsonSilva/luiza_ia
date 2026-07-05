@@ -285,6 +285,7 @@ historico = []
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
+tool_status_callback: Optional[callable] = None
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -476,16 +477,23 @@ def perguntar(texto: str) -> str:
     while iters < max_iters:
         iters += 1
         try:
+            debug.log(f"--- iteracao {iters}/{max_iters}: chamando LLM...")
             msg = _call_ollama(messages, tools=tools)
         except Exception as e:
             debug.log(f"Ollama falhou apos retries: {e}")
             resposta = "Desculpe, tive um problema para pensar agora. Pode tentar de novo?"
             break
-        if msg.get("content"):
-            resposta = remover_emojis(msg["content"]).strip()
-        tool_calls = msg.get("tool_calls")
 
-        if not tool_calls:
+        has_content = bool(msg.get("content"))
+        tool_calls = msg.get("tool_calls")
+        has_tools = bool(tool_calls)
+
+        if has_content:
+            resposta = remover_emojis(msg["content"]).strip()
+
+        debug.log(f"iteracao {iters}/{max_iters}: content={'sim' if has_content else 'nao'} ({len(resposta) if resposta else 0} chars), tool_calls={len(tool_calls) if has_tools else 0}")
+
+        if not has_tools:
             break
 
         messages.append(msg)
@@ -502,6 +510,10 @@ def perguntar(texto: str) -> str:
                     debug.log(f"Falha ao parsear arguments da tool '{name}': {args}")
                     continue
 
+            debug.log(f"tool_call: {name} args={args}")
+            if tool_status_callback:
+                tool_status_callback(name)
+
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
@@ -509,30 +521,44 @@ def perguntar(texto: str) -> str:
                 mem = memoria.carregar(child_id_ativo)
                 memoria.adicionar_fato(mem, "nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
+                debug.log(f"tool: lembrar_nome -> nome='{args['nome']}' id={child_id_ativo[:12]}...")
             elif name == "carregar_memoria":
                 result = memoria.carregar_tudo(child_id_ativo)
                 needs_rerun = True
+                debug.log(f"tool: carregar_memoria -> {len(result)} chars")
             elif name == "salvar_memoria" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
+                debug.log(f"tool: salvar_memoria -> {args['chave']}={args['valor']}")
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
                 needs_rerun = True
+                debug.log(f"tool: buscar_clima -> {result[:80]}...")
             elif name == "buscar_web" and args.get("consulta"):
                 result = contexto.buscar_web(args["consulta"])
                 result = ctx_mgr.comprimir_tool_output("buscar_web", result)
                 needs_rerun = True
+                debug.log(f"tool: buscar_web consulta='{args['consulta']}' -> {len(result)} chars")
             elif name == "calculadora":
                 result = _executar_calculadora(args)
+                debug.log(f"tool: calculadora -> {result}")
             elif name == "pergunta_matematica":
                 result = _executar_pergunta_matematica(args)
+                debug.log(f"tool: pergunta_matematica -> {result}")
             else:
                 result = "Nao foi possivel executar."
+                debug.log(f"tool: desconhecida '{name}'")
 
             messages.append({"role": "tool", "content": result, "name": name})
 
+        if tool_calls and not resposta:
+            debug.log("tool_call sem resposta textual, forçando re-run da LLM")
+            needs_rerun = True
+
         if not needs_rerun:
             break
+
+    debug.log(f"perguntar: resposta final ({len(resposta)} chars): '{resposta[:80]}{'...' if len(resposta) > 80 else ''}'")
 
     memoria.salvar(mem, child_id_ativo)
 
@@ -553,6 +579,16 @@ def falar(texto: str):
     was_streaming = stream is not None
     if stream:
         parar_stream()
+
+    if not texto:
+        debug.log("falar: texto vazio, ignorando")
+        if was_streaming:
+            try:
+                iniciar_stream()
+                debug.log("falar: stream reiniciado (texto vazio)")
+            except Exception as e:
+                debug.log(f"falar: erro ao reiniciar stream: {e}")
+        return
 
     try:
         samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")

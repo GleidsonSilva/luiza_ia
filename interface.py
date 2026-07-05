@@ -731,6 +731,7 @@ class LuizaApp(App[None]):
                                                   pause=True)
         self._trans_timer = self.set_interval(1 / 18, self._step_transicao,
                                                   pause=True)
+        assistente.tool_status_callback = lambda name: self.call_from_thread(self._usando_ferramenta, name)
         self._agendar_piscar()
         self._agendar_olhar()
         self._agendar_bocejo()
@@ -1071,6 +1072,23 @@ class LuizaApp(App[None]):
         texto = f"[{cor}] {k_tokens:.1f}K / {k_limite:.0f}K  {pct:.0%} ctx[/]"
         try:
             self.query_one("#ctx-usage", Static).update(texto)
+        except Exception:
+            pass
+
+    def _usando_ferramenta(self, nome):
+        nomes_amigaveis = {
+            "lembrar_nome": "Lembrando quem é você...",
+            "salvar_memoria": "Guardando informação...",
+            "carregar_memoria": "Buscando lembranças...",
+            "buscar_clima": "Olhando o clima...",
+            "buscar_web": "Pesquisando...",
+            "calculadora": "Calculando...",
+            "pergunta_matematica": "Preparando pergunta...",
+        }
+        label = nomes_amigaveis.get(nome, f"Usando {nome}...")
+        try:
+            status = self.query_one("#status", Static)
+            status.update(f"[#FF9800]🔧 {label}[/]")
         except Exception:
             pass
 
