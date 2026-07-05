@@ -343,18 +343,52 @@ def falar(texto: str):
     if stream:
         parar_stream()
 
-    samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
+    try:
+        samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.3, lang="pt-br")
+    except Exception as e:
+        debug.log(f"falar: kokoro.create falhou: {e}")
+        if was_streaming:
+            try:
+                iniciar_stream()
+                debug.log("falar: stream reiniciado")
+            except Exception as e:
+                debug.log(f"falar: erro ao reiniciar stream: {e}")
+        return
+
+    sd.stop()
+    debug.log(f"falar: iniciando playback, samples={len(samples)}")
+    t0 = time.time()
+
+    blocksize = 1024
+    idx = 0
+    playback_done = threading.Event()
+
+    def _out_callback(outdata, frames, time_info, status):
+        nonlocal idx
+        if status.output_underflow:
+            debug.log("falar: output underflow")
+        end = idx + frames
+        chunk = samples[idx:end]
+        if len(chunk) < frames:
+            outdata[:len(chunk), 0] = chunk
+            outdata[len(chunk):, 0] = 0
+            playback_done.set()
+            raise sd.CallbackStop()
+        outdata[:, 0] = chunk
+        idx = end
 
     try:
-        sd.stop()
-        debug.log(f"falar: iniciando playback, samples={len(samples)}")
-        t0 = time.time()
-        sd.play(samples, sr, blocksize=1024, latency='low')
-        sd.wait()
-        debug.log(f"falar: playback finalizado em {time.time()-t0:.2f}s")
+        with sd.OutputStream(samplerate=sr, channels=1, dtype="float32",
+                             callback=_out_callback, blocksize=blocksize,
+                             latency='low') as out_stream:
+            out_stream.start()
+            if not playback_done.wait(timeout=60.0):
+                debug.log("falar: timeout playback")
+                out_stream.abort()
     except Exception as e:
         debug.log(f"falar error: {e}")
     finally:
+        debug.log(f"falar: playback finalizado em {time.time()-t0:.2f}s")
         if was_streaming:
             try:
                 iniciar_stream()

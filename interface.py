@@ -1,5 +1,6 @@
 import threading, random, time, re
 import numpy as np
+import sounddevice as sd
 import assistente
 import debug
 
@@ -9,6 +10,42 @@ from textual.widgets import Static
 from textual.containers import Container, Horizontal
 from textual_canvas import Canvas
 from textual.color import Color
+
+
+class VADBuffer:
+    def __init__(self, max_chunks=32):
+        from collections import deque
+        self._buf = deque(maxlen=max_chunks)
+        self._sum_sq = 0.0
+        self._count = 0
+
+    def update(self, chunk):
+        arr = np.asarray(chunk, dtype=np.float32)
+        if arr.ndim > 1:
+            arr = arr.reshape(-1)
+        self._sum_sq += float(np.dot(arr, arr))
+        self._count += int(arr.size)
+        if len(self._buf) == self._buf.maxlen:
+            old = self._buf[0]
+            self._sum_sq -= float(np.dot(old, old))
+            self._count -= int(old.size)
+        self._buf.append(arr)
+
+    @property
+    def count(self):
+        return self._count
+
+    @property
+    def rms(self):
+        if self._count == 0:
+            return 0.0
+        return float(np.sqrt(self._sum_sq / self._count))
+
+    def clear(self):
+        self._buf.clear()
+        self._sum_sq = 0.0
+        self._count = 0
+
 
 W, H = 120, 72
 FX, FY = 60, 43
@@ -372,6 +409,7 @@ class LuizaApp(App[None]):
         self._silencio_count = 0
         self._inicio_gravacao = 0.0
         self._boca_delay_timer = None
+        self._vad = VADBuffer()
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -450,6 +488,7 @@ class LuizaApp(App[None]):
 
     def _iniciar_gravacao(self):
         self.gravando = True
+        self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
         self._silencio_count = 0
@@ -473,30 +512,42 @@ class LuizaApp(App[None]):
     def _verificar_silencio(self):
         if not self.gravando:
             return
-        with assistente.buf_lock:
-            recent = assistente.buf[self.recording_idx:]
-        if not recent:
-            return
-        chunks = []
-        n = 0
-        for chunk in reversed(recent):
-            chunks.append(chunk)
-            n += len(chunk)
-            if n >= 16000:
-                break
-        if n < 4000:
-            return
-        audio = np.concatenate(list(reversed(chunks)))
-        rms = np.sqrt(np.mean(audio**2))
-        if rms < 0.008:
-            self._silencio_count += 1
-            if self._silencio_count >= 10:
-                debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
-                self._parar_gravacao()
-        else:
-            self._silencio_count = 0
+        try:
+            with assistente.buf_lock:
+                recent = assistente.buf[self.recording_idx:]
+            if not recent:
+                return
+            for chunk in recent:
+                self._vad.update(chunk)
+            if self._vad.count < 4000:
+                return
+            rms = self._vad.rms
+            if rms < 0.008:
+                self._silencio_count += 1
+                if self._silencio_count >= 10:
+                    debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
+                    self._parar_gravacao()
+            else:
+                self._silencio_count = 0
+        except Exception as e:
+            import traceback
+            import io
+            tb = io.StringIO()
+            traceback.print_exc(file=tb)
+            debug.log(f"_verificar_silencio ERRO: {e}\n{tb.getvalue()}")
 
     def _processar(self, audio):
+        t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
+        t.start()
+        if not t.join(timeout=25.0):
+            sd.stop()
+            debug.log("_processar: timeout")
+            self.call_from_thread(self._atualizar_tts, "Desculpe, demorou demais")
+            t.join(timeout=5.0)
+            self.processando = False
+            self.call_from_thread(self._voltar_idle)
+
+    def _processar_impl(self, audio):
         try:
             debug.log(f"_processar: audio shape={audio.shape}")
             texto = assistente.transcrever(audio)
