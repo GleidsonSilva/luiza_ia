@@ -323,6 +323,15 @@ class LuizaApp(App[None]):
         text-align: center;
         margin-top: 1;
     }
+
+    #ctx-usage {
+        height: 1;
+        text-align: right;
+        margin-top: 0;
+        width: 1fr;
+        color: #999;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -372,6 +381,7 @@ class LuizaApp(App[None]):
         yield Static(" ", id="stt-text", classes="bubble")
         yield Static("Luiza:", classes="label label-luiza")
         yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
+        yield Static("", id="ctx-usage")
         yield Static("\\[Espaço/Enter] Falar  \\[Esc] Sair", id="hint")
 
     def on_mount(self):
@@ -501,6 +511,7 @@ class LuizaApp(App[None]):
             debug.log("chamando perguntar...")
             resposta = assistente.perguntar(texto)
             debug.log(f"resposta='{resposta}'")
+            self.call_from_thread(self._atualizar_ctx)
 
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
@@ -527,6 +538,26 @@ class LuizaApp(App[None]):
         if texto:
             texto = re.sub(r'\s+', ' ', texto).strip()
         self.query_one("#tts-text", Static).update(texto)
+
+    def _atualizar_ctx(self):
+        s = assistente.ultimo_ctx_status
+        tokens = s.get("total_tokens", 0)
+        limite = s.get("context_limit", 1)
+        pct = s.get("percentual", 0.0)
+        pct = max(0.0, min(1.0, pct))
+        k_tokens = tokens / 1024
+        k_limite = limite / 1024
+        if pct >= 0.95:
+            cor = "#F44336"
+        elif pct >= 0.85:
+            cor = "#FFC107"
+        else:
+            cor = "#999"
+        texto = f"[{cor}] {k_tokens:.1f}K / {k_limite:.0f}K  {pct:.0%} ctx[/]"
+        try:
+            self.query_one("#ctx-usage", Static).update(texto)
+        except Exception:
+            pass
 
     def _voltar_idle(self):
         self._mudar_expressao("idle")

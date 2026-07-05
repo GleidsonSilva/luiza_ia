@@ -14,7 +14,9 @@ import mlx_whisper
 import requests
 from kokoro_onnx import Kokoro
 import memoria
+import memoria_rag
 import contexto
+import gerenciador_contexto as ctx_mgr
 import debug
 
 SR = 16000
@@ -23,7 +25,8 @@ TARGET_PEAK = 0.95
 MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
-MAX_HISTORICO = 5
+MAX_HISTORICO_TURNOS = 10
+COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
@@ -148,6 +151,10 @@ tools = [
 mem = memoria.carregar()
 _identidade_confirmada = False
 historico = []
+resumo_sessao = ""
+turnos_desde_compactacao = 0
+ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
+
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     mask = np.abs(audio) > threshold
@@ -155,6 +162,7 @@ def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     if len(idxs) == 0:
         return audio
     return audio[idxs[0]:idxs[-1] + 1]
+
 
 def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
@@ -184,17 +192,79 @@ def transcrever(audio: np.ndarray) -> str:
         return ""
     return texto
 
-def perguntar(texto: str) -> str:
-    global historico, _identidade_confirmada
-    system = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
-    if _identidade_confirmada:
-        memorias = memoria.formatar_para_prompt(mem)
-        if memorias:
-            system += f"\n\n### IDENTIDADE\n{memorias}"
 
-    messages = [{"role": "system", "content": system}]
-    messages.extend(historico)
+def compactar_historico(historico_para_resumir: list[dict]) -> str:
+    if not historico_para_resumir:
+        return ""
+    texto = "\n".join(
+        f"{msg['role']}: {msg['content']}" for msg in historico_para_resumir
+    )
+    prompt = (
+        "Resuma a conversa abaixo em PT-BR, ate 1000 tokens, "
+        "mantendo: nome da crianca, fatos sobre ela, "
+        "temas e brincadeiras mencionados, e o assunto principal.\n\n"
+        + texto
+    )
+    messages = [
+        {"role": "system", "content": "Voce faz resumos curtos e informativos."},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        r = requests.post(OLLAMA_URL, json={
+            "model": MODEL, "messages": messages, "stream": False,
+            "options": {"temperature": 0.3, "max_tokens": 300},
+        }, timeout=30)
+        body = r.json()
+        return body.get("message", {}).get("content", "").strip()
+    except Exception as e:
+        debug.log(f"compactacao falhou: {e}")
+        return ""
+
+
+def _resolver_tool_output(content: str) -> str:
+    if content and content.startswith("memory://"):
+        return ctx_mgr.resolver_ponteiro(content)
+    return content
+
+
+def perguntar(texto: str) -> str:
+    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status
+
+    system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
+
+    memoria_raw = memoria.formatar_para_prompt(mem)
+    if memoria_raw:
+        system_content += f"\n\n### IDENTIDADE\n{memoria_raw}"
+
+    if resumo_sessao:
+        system_content += f"\n\n### RESUMO_SESSAO\n{resumo_sessao}"
+
+    messages = [{"role": "system", "content": system_content}]
+
+    orcamento = ctx_mgr.calcular_orcamento(MODEL)
+    historico_janela = ctx_mgr.aplicar_janela_deslizante(
+        historico, limite_tokens=orcamento["history_recent"]
+    )
+    messages.extend(historico_janela)
+
     messages.append({"role": "user", "content": texto})
+
+    check = ctx_mgr.verificar_orcamento(messages, MODEL)
+    ultimo_ctx_status = check
+    debug.log(f"preflight: tokens={check['total_tokens']}, limit={check['context_limit']}, pct={check['percentual']:.0%}, acao={check['acao']}")
+
+    if check["acao"] == "erro":
+        return "Desculpe, a conversa ficou muito longa. Vamos comecar de novo?"
+    if check["acao"] == "compactar":
+        if turnos_desde_compactacao >= COMPACTION_THRESHOLD:
+            resumo = compactar_historico(historico)
+            if resumo:
+                resumo_sessao = resumo
+                turnos_desde_compactacao = 0
+                messages = [{"role": "system", "content": system_content}]
+                messages.extend(historico_janela)
+                messages.append({"role": "user", "content": texto})
+                debug.log("compactacao aplicada")
 
     resposta = ""
     needs_rerun = False
@@ -238,6 +308,9 @@ def perguntar(texto: str) -> str:
                 needs_rerun = True
             elif name == "buscar_web" and args.get("consulta"):
                 result = contexto.buscar_web(args["consulta"])
+                compressed = ctx_mgr.comprimir_tool_output("buscar_web", result)
+                pointer = ctx_mgr.armazenar_ponteiro(result)
+                result = pointer + "\n\n" + compressed
                 needs_rerun = True
             else:
                 result = "Nao foi possivel executar."
@@ -254,10 +327,15 @@ def perguntar(texto: str) -> str:
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})
-    if len(historico) > MAX_HISTORICO * 2:
-        historico = historico[-(MAX_HISTORICO * 2):]
+
+    max_hist = MAX_HISTORICO_TURNOS * 2
+    if len(historico) > max_hist:
+        historico = historico[-max_hist:]
+
+    turnos_desde_compactacao += 1
 
     return resposta
+
 
 def falar(texto: str):
     global stream
@@ -274,9 +352,15 @@ def falar(texto: str):
         sd.play(samples, sr, blocksize=1024, latency='low')
         sd.wait()
         debug.log(f"falar: playback finalizado em {time.time()-t0:.2f}s")
+    except Exception as e:
+        debug.log(f"falar error: {e}")
     finally:
         if was_streaming:
-            iniciar_stream()
+            try:
+                iniciar_stream()
+                debug.log("falar: stream reiniciado")
+            except Exception as e:
+                debug.log(f"falar: erro ao reiniciar stream: {e}")
 
 def key_pressed() -> bool:
     if select.select([sys.stdin], [], [], 0)[0]:

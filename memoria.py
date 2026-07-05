@@ -36,6 +36,9 @@ def formatar_para_prompt(mem: dict) -> str:
         partes.append(f"Brincadeiras que ja fizeram juntos: {jogos}.")
     return " ".join(partes) if partes else ""
 
+def estimar_tokens(texto: str) -> int:
+    return max(1, len(texto) // 4)
+
 def extrair_fatos(texto: str, mem: dict) -> dict:
     c = mem["crianca"]
     padroes = [
