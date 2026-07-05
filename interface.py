@@ -150,17 +150,31 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0, rms=0.0, t=0.0):
         c.set_pixel(cx + ox, cy - dy - 1, CILIO)
         c.set_pixel(cx + ox, cy - dy - 2, CILIO)
 
-def _boca_curva(c, cx, cy, abertura, largura):
+def _boca_curva(c, cx, cy, abertura, largura, assimetrico=0):
+    dy_max = int(abertura / 2)
     for dx in range(-largura, largura + 1):
         dy = int((dx * dx) / (largura * largura / abertura) - abertura / 2)
-        c.set_pixel(cx + dx, cy - dy, BOCA_COR)
-        c.set_pixel(cx + dx, cy - dy + 1, BOCA_COR)
-        if abs(dx) > largura // 2:
-            c.set_pixel(cx + dx, cy - dy - 1, Color(
-                max(0, BOCA_COR.r - 30),
-                max(0, BOCA_COR.g - 30),
-                max(0, BOCA_COR.b - 30)
-            ))
+        asy = int(assimetrico * dx / largura) if assimetrico else 0
+        c.set_pixel(cx + dx, cy - dy - 1 + asy, Color(
+            max(0, BOCA_COR.r - 30),
+            max(0, BOCA_COR.g - 30),
+            max(0, BOCA_COR.b - 30)
+        ))
+        c.set_pixel(cx + dx, cy - dy + asy, BOCA_COR)
+        c.set_pixel(cx + dx, cy - dy + 1 + asy, BOCA_COR)
+        if abs(dx) <= largura // 3:
+            hl = Color(
+                min(255, BOCA_COR.r + 40),
+                min(255, BOCA_COR.g + 40),
+                min(255, BOCA_COR.b + 40)
+            )
+            c.set_pixel(cx + dx, cy - dy + 2 + asy, hl)
+
+    flick_y = cy - dy_max - 2
+    c.set_pixel(cx - largura - 1, flick_y, BOCA_COR)
+    c.set_pixel(cx - largura - 2, flick_y + 1, BOCA_COR)
+    c.set_pixel(cx + largura + 1, flick_y, BOCA_COR)
+    c.set_pixel(cx + largura + 2, flick_y + 1, BOCA_COR)
 
 def _boca_retang(c, cx, cy, w, h, inner=False, curve=True):
     shadow = Color(
@@ -184,9 +198,9 @@ def _boca_retang(c, cx, cy, w, h, inner=False, curve=True):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 7, 13)
+        _boca_curva(c, cx, cy, 7, 15, assimetrico=1)
     elif forma == "slight":
-        _boca_curva(c, cx, cy, 4, 9)
+        _boca_curva(c, cx, cy, 4, 10)
     elif forma == "open_small":
         _boca_retang(c, cx, cy, 3, 4)
     elif forma == "open_medium":
