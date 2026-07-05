@@ -523,7 +523,7 @@ def falar(texto: str):
         parar_stream()
 
     try:
-        samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.1, lang="pt-br")
+        samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")
     except Exception as e:
         debug.log(f"falar: kokoro.create falhou: {e}")
         if was_streaming:
