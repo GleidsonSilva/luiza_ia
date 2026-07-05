@@ -51,6 +51,7 @@ W, H = 120, 72
 FX, FY = 60, 43
 
 PELE = Color(255, 200, 160)
+NARIZ = Color(235, 180, 145)
 OLHO = Color(70, 148, 80)
 SOBRANCELHA = Color(94, 60, 45)
 BRANCO = Color(255, 255, 255)
@@ -216,6 +217,12 @@ def _boca_dinamica(c, cx, cy, base_forma, rms, frame):
 def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 3, BLUSH)
     _filled_circle(c, FX + 22, FY + 2, 3, BLUSH)
+
+def _nariz(c):
+    c.set_pixel(FX - 1, FY + 1, NARIZ)
+    c.set_pixel(FX, FY + 1, NARIZ)
+    c.set_pixel(FX - 1, FY + 2, NARIZ)
+    c.set_pixel(FX, FY + 2, NARIZ)
 
 def _palpebra(c, cx, cy):
     for ox in range(-6, 7):
@@ -419,6 +426,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "smile")
     elif expressao == "ouvindo":
         _sobrancelhas(c, "animada", t=now)
@@ -427,6 +435,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "slight")
         _barras_audio(c, rms=audio_rms)
     elif expressao == "pensando":
@@ -437,6 +446,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "curiosa", t=now)
@@ -445,6 +455,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y - 3)
         _palpebra(c, EYE_R, EYE_Y - 3)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "surprised")
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
@@ -453,6 +464,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         if mouth_h is not None:
             w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
             _boca_retang(c, FX, MOUTH_Y, w, int(mouth_h), inner=audio_rms > 0.04)
@@ -466,6 +478,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "brava":
         _sobrancelhas(c, "brava", t=now)
@@ -474,6 +487,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "slight")
     elif expressao == "animada":
         _sobrancelhas(c, "animada", t=now)
@@ -482,6 +496,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _palpebra(c, EYE_L, EYE_Y)
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
+        _nariz(c)
         _boca(c, FX, MOUTH_Y, "smile")
 
     if piscando:
