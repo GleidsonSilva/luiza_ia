@@ -109,27 +109,48 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
     if estilo == "normal":
         _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
+        c.set_pixel(cx + 2, cy - 2, SOBRANCELHA)
+        c.set_pixel(cx - 2, cy - 2, SOBRANCELHA)
     elif estilo == "happy":
         _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
+        c.set_pixel(cx + 2, cy - 2, SOBRANCELHA)
+        c.set_pixel(cx - 2, cy - 2, SOBRANCELHA)
     elif estilo == "focused":
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
+        c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
     elif estilo == "up":
         _filled_circle(c, cx - 1, cy - 2, 2, OLHO)
+        c.set_pixel(cx, cy - 3, BRANCO)
     elif estilo == "olhando":
         _filled_circle(c, cx + fdx, cy + fdy, 3, OLHO)
         c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
+        c.set_pixel(cx + 2 + fdx, cy - 2 + fdy, SOBRANCELHA)
+        c.set_pixel(cx - 1 + fdx, cy - 2 + fdy, SOBRANCELHA)
 
 def _boca_curva(c, cx, cy, abertura, largura):
     for dx in range(-largura, largura + 1):
         dy = int((dx * dx) / (largura * largura / abertura) - abertura / 2)
         c.set_pixel(cx + dx, cy - dy, BOCA_COR)
         c.set_pixel(cx + dx, cy - dy + 1, BOCA_COR)
+        if abs(dx) > largura // 2:
+            c.set_pixel(cx + dx, cy - dy - 1, Color(
+                max(0, BOCA_COR.r - 30),
+                max(0, BOCA_COR.g - 30),
+                max(0, BOCA_COR.b - 30)
+            ))
 
 def _boca_retang(c, cx, cy, w, h):
+    shadow = Color(
+        max(0, BOCA_COR.r - 40),
+        max(0, BOCA_COR.g - 40),
+        max(0, BOCA_COR.b - 40)
+    )
     for dy in range(h):
         for dx in range(-w, w + 1):
             c.set_pixel(cx + dx, cy + dy, BOCA_COR)
+            if dy == h - 1 and dx % 2 == 0:
+                c.set_pixel(cx + dx, cy + dy + 1, shadow)
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
@@ -163,6 +184,12 @@ def _palpebra(c, cx, cy):
     for ox in range(-6, 7):
         oy = (ox * ox) // 7
         c.set_pixel(cx + ox, cy - 7 + oy, SOBRANCELHA)
+        if ox % 2 == 0:
+            c.set_pixel(cx + ox, cy - 6 + oy, Color(
+                max(0, SOBRANCELHA.r - 20),
+                max(0, SOBRANCELHA.g - 20),
+                max(0, SOBRANCELHA.b - 20)
+            ))
 
 def _olho_fechado(c, cx, cy):
     _filled_circle(c, cx, cy, 7, PELE)
@@ -184,6 +211,9 @@ def _sobrancelhas(c, estilo):
 
 def _tapete(c):
     _filled_oval(c, FX, 67, 30, 4, RUG)
+    for y in range(65, 70, 2):
+        for x in range(FX - 28, FX + 29):
+            c.set_pixel(x, y, Color(180, 130, 150))
 
 def _janela(c):
     for y in range(3, 21):
@@ -196,24 +226,35 @@ def _janela(c):
     c.draw_line(111, 3, 111, 20, FRAME)
     c.draw_line(103, 11, 119, 11, FRAME)
 
-def _lua_estrelas(c):
+def _lua_estrelas(c, now=0.0):
     _filled_circle(c, 16, 10, 6, MOON)
     _filled_circle(c, 13, 8, 5, WALL)
-    for sx, sy in [(30,5), (25,18), (35,12), (8,22), (20,25)]:
-        c.set_pixel(sx, sy, STAR)
-        c.set_pixel(sx + 1, sy + 1, STAR)
-        c.set_pixel(sx - 1, sy + 1, STAR)
-        c.set_pixel(sx, sy + 2, STAR)
-        c.set_pixel(sx + 1, sy - 1, STAR)
+    _filled_circle(c, 14, 9, 2, Color(235, 235, 210))
+    _filled_circle(c, 18, 12, 1, Color(235, 235, 210))
+    for idx, (sx, sy) in enumerate([(30,5), (25,18), (35,12), (8,22), (20,25)]):
+        phase = now * 3 + idx * 1.3
+        blink = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(phase))
+        star_color = Color(
+            int(STAR.r * blink),
+            int(STAR.g * blink),
+            int(STAR.b * blink)
+        )
+        c.set_pixel(sx, sy, star_color)
+        c.set_pixel(sx + 1, sy + 1, star_color)
+        c.set_pixel(sx - 1, sy + 1, star_color)
+        c.set_pixel(sx, sy + 2, star_color)
+        c.set_pixel(sx + 1, sy - 1, star_color)
 
-def _barras_audio(c):
+def _barras_audio(c, rms=0.0):
     bx, by = 100, 50
-    alturas = [2, 3, 4, 3]
-    t = int(time.time() * 6) % 3
-    offsets = [-1, 0, 1]
-    for i, base_h in enumerate(alturas):
-        h = base_h + offsets[(t + i) % 3]
-        h = max(1, h)
+    base_heights = [2, 3, 4, 3]
+    t = time.time() * 8
+    for i, base_h in enumerate(base_heights):
+        phase = t + i * 1.2
+        wave = np.sin(phase) * 0.5 + 0.5
+        audio_influence = min(1.0, rms * 40.0)
+        h = int(base_h + wave * 2 + audio_influence * 2)
+        h = max(1, min(6, h))
         for y in range(by - h, by + h):
             for x in range(bx + i * 4, bx + i * 4 + 2):
                 c.set_pixel(x, y, STAR)
@@ -223,14 +264,29 @@ def _corpo(c):
     for x in range(56, 64):
         for y in range(57, 59):
             c.set_pixel(x, y, PELE)
+    shadow = Color(
+        max(0, DRESS.r - 25),
+        max(0, DRESS.g - 25),
+        max(0, DRESS.b - 25)
+    )
     for y in range(59, H):
         for x in range(FX - 12, FX + 13):
             c.set_pixel(x, y, DRESS)
+    for y in range(62, H, 3):
+        for x in range(FX - 12, FX + 13):
+            c.set_pixel(x, y, shadow)
 
 def _cabelo_atras(c):
+    shadow = Color(
+        max(0, CABELO.r - 35),
+        max(0, CABELO.g - 35),
+        max(0, CABELO.b - 35)
+    )
     _filled_oval(c, FX, FY - 18, 50, 19, CABELO)
     _filled_oval(c, FX - 40, FY - 10, 14, 20, CABELO)
     _filled_oval(c, FX + 40, FY - 10, 14, 20, CABELO)
+    _filled_oval(c, FX - 35, FY - 10, 10, 18, shadow)
+    _filled_oval(c, FX + 35, FY - 10, 10, 18, shadow)
 
 def _franja(c):
     for x in range(33, 90, 6):
@@ -246,11 +302,13 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
+def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None):
+    if now is None:
+        now = time.time()
     c.clear()
     _tapete(c)
     _janela(c)
-    _lua_estrelas(c)
+    _lua_estrelas(c, now=now)
     _corpo(c)
     _cabelo_atras(c)
     _filled_oval(c, FX, FY, 36, 28, PELE)
@@ -273,7 +331,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, "slight")
-        _barras_audio(c)
+        _barras_audio(c, rms=audio_rms)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida")
         fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
@@ -299,6 +357,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0)):
         _palpebra(c, EYE_R, EYE_Y)
         _blush(c)
         _boca(c, FX, MOUTH_Y, MOUTH_CYCLE[frame_boca])
+        _barras_audio(c, rms=audio_rms)
 
     if piscando:
         _olho_fechado(c, EYE_L, EYE_Y - 1)
@@ -341,10 +400,14 @@ class LuizaApp(App[None]):
         height: 5;
         margin: 0 4;
         overflow: hidden;
+        border-top: round #d0c0a8;
+        border-bottom: round #d0c0a8;
     }
 
     .bubble-luiza {
         border: solid #D4726A;
+        border-top: round #D4726A;
+        border-bottom: round #D4726A;
     }
 
     .bubble-erro {
@@ -411,6 +474,7 @@ class LuizaApp(App[None]):
         self._inicio_gravacao = 0.0
         self._boca_delay_timer = None
         self._vad = VADBuffer()
+        self._audio_rms = 0.0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -467,7 +531,8 @@ class LuizaApp(App[None]):
         canvas = self.query_one("#rosto", Canvas)
         with canvas.batch_refresh():
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
-                           self._piscando, self._olho_dir)
+                           self._piscando, self._olho_dir,
+                           audio_rms=self._audio_rms, now=time.time())
 
     def _mudar_expressao(self, expressao):
         if self._boca_delay_timer:
@@ -558,6 +623,7 @@ class LuizaApp(App[None]):
                     self._parar_gravacao()
             else:
                 self._silencio_count = 0
+            self._audio_rms = rms
         except Exception as e:
             import traceback
             import io
