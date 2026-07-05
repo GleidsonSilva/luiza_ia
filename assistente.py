@@ -61,6 +61,7 @@ Nao use emojis ou simbolos. Nenhum emoji. Nunca.
 
 ### SE A CRIANCA PEDIR PARA BRINCAR, VOCE SABE:
 - forca: escolha palavras curtas (max 6 letras), diga o numero de letras, nao use nomes proprios
+- matematica: use pergunta_matematica para gerar uma conta de soma ou subtracao com numeros de 1 digito. Depois pergunte o resultado. Se a crianca acertar, elogie. Se errar, mostre a resposta correta de forma carinhosa
 - adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
 - 20 perguntas: deixe a crianca fazer perguntas para adivinhar o que voce pensou
 - cadeia de palavras: uma pessoa fala uma palavra e a proxima fala outra que comeca com a ultima letra
@@ -83,6 +84,8 @@ Nao use emojis ou simbolos. Nenhum emoji. Nunca.
 - Se nao souber a cidade, pergunte primeiro onde ela mora antes de usar buscar_clima
 - Use buscar_web quando ela mencionar algo que voce nao conhece (animal, brinquedo, lugar, assunto) e ela pedir informacao
 - Nao use buscar_web para assuntos que voce deveria saber naturalmente
+- Use calculadora para fazer contas simples quando a crianca pedir ou durante uma brincadeira de matematica
+- Use pergunta_matematica para gerar uma conta aleatoria quando brincar de matematica
 - Nao faca perguntas de confirmacao desnecessarias se a informacao ja estiver clara
 
 ### MEMORIA
@@ -182,6 +185,59 @@ tools = [
                 "required": ["consulta"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculadora",
+            "description": "Faz uma conta simples de soma ou subtracao com 2 ou 3 numeros pequenos",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {
+                        "type": "integer",
+                        "description": "Primeiro numero de 1 digito (0 a 9)"
+                    },
+                    "b": {
+                        "type": "integer",
+                        "description": "Segundo numero de 1 digito (0 a 9)"
+                    },
+                    "c": {
+                        "type": "integer",
+                        "description": "Terceiro numero opcional de 1 digito (0 a 9), use apenas para 3 numeros"
+                    },
+                    "operacao": {
+                        "type": "string",
+                        "description": "Operacao a ser feita: soma ou subtracao",
+                        "enum": ["soma", "subtracao"]
+                    }
+                },
+                "required": ["a", "b", "operacao"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "pergunta_matematica",
+            "description": "Gera uma pergunta aleatoria simples de matematica com numeros de 1 digito",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tipo": {
+                        "type": "string",
+                        "description": "Tipo de operacao: soma ou subtracao",
+                        "enum": ["soma", "subtracao"]
+                    },
+                    "quantidade": {
+                        "type": "integer",
+                        "description": "Quantidade de numeros na conta: 2 ou 3",
+                        "enum": [2, 3]
+                    }
+                },
+                "required": ["tipo", "quantidade"]
+            }
+        }
     }
 ]
 
@@ -264,6 +320,62 @@ def _resolver_tool_output(content: str) -> str:
     if content and content.startswith("memory://"):
         return ctx_mgr.resolver_ponteiro(content)
     return content
+
+
+def _executar_calculadora(args: dict) -> str:
+    try:
+        a = int(args.get("a", 0))
+        b = int(args.get("b", 0))
+        c = args.get("c")
+        operacao = args.get("operacao", "soma")
+
+        if not (0 <= a <= 9 and 0 <= b <= 9):
+            return "Erro: todos os numeros devem ser de 1 digito (0 a 9)."
+        if c is not None:
+            c = int(c)
+            if not (0 <= c <= 9):
+                return "Erro: todos os numeros devem ser de 1 digito (0 a 9)."
+
+        if operacao == "soma":
+            total = a + b + (c if c is not None else 0)
+            expressao = f"{a} + {b}" + (f" + {c}" if c is not None else "")
+        elif operacao == "subtracao":
+            total = a - b - (c if c is not None else 0)
+            expressao = f"{a} - {b}" + (f" - {c}" if c is not None else "")
+        else:
+            return "Erro: operacao invalida. Use soma ou subtracao."
+
+        return f"{expressao} = {total}"
+    except Exception as e:
+        return f"Erro na calculadora: {e}"
+
+
+def _executar_pergunta_matematica(args: dict) -> str:
+    try:
+        import random
+
+        operacao = args.get("operacao", args.get("tipo", "soma"))
+        quantidade = int(args.get("quantidade", 2))
+
+        if operacao not in ("soma", "subtracao"):
+            operacao = "soma"
+        if quantidade not in (2, 3):
+            quantidade = 2
+
+        a = random.randint(0, 9)
+        b = random.randint(0, 9)
+        c = random.randint(0, 9) if quantidade == 3 else None
+
+        if operacao == "soma":
+            total = a + b + (c if c is not None else 0)
+            expressao = f"{a} + {b}" + (f" + {c}" if c is not None else "")
+        else:
+            total = a - b - (c if c is not None else 0)
+            expressao = f"{a} - {b}" + (f" - {c}" if c is not None else "")
+
+        return f"pergunta|{expressao} = ?|resposta|{total}"
+    except Exception as e:
+        return f"Erro ao gerar pergunta: {e}"
 
 
 def perguntar(texto: str) -> str:
@@ -365,6 +477,10 @@ def perguntar(texto: str) -> str:
                 pointer = ctx_mgr.armazenar_ponteiro(result)
                 result = pointer + "\n\n" + compressed
                 needs_rerun = True
+            elif name == "calculadora":
+                result = _executar_calculadora(args)
+            elif name == "pergunta_matematica":
+                result = _executar_pergunta_matematica(args)
             else:
                 result = "Nao foi possivel executar."
 
