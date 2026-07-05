@@ -109,13 +109,11 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
     if estilo == "normal":
         _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.set_pixel(cx + 2, cy - 2, SOBRANCELHA)
-        c.set_pixel(cx - 2, cy - 2, SOBRANCELHA)
+        c.set_pixel(cx, cy - 2, Color(120, 180, 130))
     elif estilo == "happy":
         _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.set_pixel(cx + 2, cy - 2, SOBRANCELHA)
-        c.set_pixel(cx - 2, cy - 2, SOBRANCELHA)
+        c.set_pixel(cx, cy - 2, Color(120, 180, 130))
     elif estilo == "focused":
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
         c.set_pixel(cx + 1 + fdx, cy - 1 + fdy, BRANCO)
@@ -154,7 +152,7 @@ def _boca_retang(c, cx, cy, w, h):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
-        _boca_curva(c, cx, cy, 6, 12)
+        _boca_curva(c, cx, cy, 6, 13)
     elif forma == "slight":
         _boca_curva(c, cx, cy, 4, 9)
     elif forma == "open_small":
@@ -179,6 +177,8 @@ def _boca(c, cx, cy, forma):
 def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 5, BLUSH)
     _filled_circle(c, FX + 22, FY + 2, 5, BLUSH)
+    _filled_circle(c, FX - 22, FY + 2, 2, Color(255, 160, 190))
+    _filled_circle(c, FX + 22, FY + 2, 2, Color(255, 160, 190))
 
 def _palpebra(c, cx, cy):
     for ox in range(-6, 7):
@@ -215,16 +215,47 @@ def _tapete(c):
         for x in range(FX - 28, FX + 29):
             c.set_pixel(x, y, Color(180, 130, 150))
 
-def _janela(c):
+def _janela(c, now=None):
+    if now is None:
+        now = time.time()
+    lt = time.localtime(now)
+    hour = lt.tm_hour
+    if hour >= 6 and hour < 12:
+        glass = Color(210, 225, 250)
+        frame = Color(170, 110, 80)
+    elif hour >= 12 and hour < 20:
+        glass = WINDOW_GLASS
+        frame = FRAME
+    else:
+        glass = Color(18, 22, 45)
+        frame = Color(80, 55, 35)
     for y in range(3, 21):
         for x in range(103, 120):
-            c.set_pixel(x, y, WINDOW_GLASS)
-    c.draw_line(103, 3, 119, 3, FRAME)
-    c.draw_line(103, 3, 103, 20, FRAME)
-    c.draw_line(119, 3, 119, 20, FRAME)
-    c.draw_line(103, 20, 119, 20, FRAME)
-    c.draw_line(111, 3, 111, 20, FRAME)
-    c.draw_line(103, 11, 119, 11, FRAME)
+            c.set_pixel(x, y, glass)
+    c.draw_line(103, 3, 119, 3, frame)
+    c.draw_line(103, 3, 103, 20, frame)
+    c.draw_line(119, 3, 119, 20, frame)
+    c.draw_line(103, 20, 119, 20, frame)
+    c.draw_line(111, 3, 111, 20, frame)
+    c.draw_line(103, 11, 119, 11, frame)
+    if hour >= 6 and hour < 20:
+        c.set_pixel(116, 6, Color(255, 240, 180))
+        c.set_pixel(117, 5, Color(255, 240, 180))
+        c.set_pixel(115, 5, Color(255, 240, 180))
+    else:
+        stars = [(106, 5), (113, 8), (107, 14), (115, 16), (109, 19), (118, 7)]
+        phase = now * 3
+        for idx, (sx, sy) in enumerate(stars):
+            blink = 0.4 + 0.6 * (0.5 + 0.5 * np.sin(phase + idx * 1.3))
+            col = Color(
+                int(STAR.r * blink),
+                int(STAR.g * blink),
+                int(STAR.b * blink)
+            )
+            if blink > 0.7:
+                c.set_pixel(sx + 1, sy, col)
+                c.set_pixel(sx - 1, sy, col)
+            c.set_pixel(sx, sy, col)
 
 def _lua_estrelas(c, now=0.0):
     _filled_circle(c, 16, 10, 6, MOON)
@@ -307,7 +338,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         now = time.time()
     c.clear()
     _tapete(c)
-    _janela(c)
+    _janela(c, now=now)
     _lua_estrelas(c, now=now)
     _corpo(c)
     _cabelo_atras(c)
@@ -392,16 +423,31 @@ class LuizaApp(App[None]):
         margin-bottom: 1;
     }
 
-    .bubble {
+    .label {
+        height: 1;
+        padding: 0 3;
+        margin-top: 0;
+        color: #2b1d0e;
+        text-style: bold;
+    }
+
+    .label-luiza {
+        color: #7a1f18;
+        text-style: bold;
+    }
+
+        .bubble {
         background: #fcf0e0;
         border: solid #d0c0a8;
         color: #4a3f35;
         padding: 0 2;
         height: 5;
-        margin: 0 4;
+        margin: 0;
         overflow: hidden;
         border-top: round #d0c0a8;
         border-bottom: round #d0c0a8;
+        width: 70%;
+        content-align: left middle;
     }
 
     .bubble-luiza {
@@ -414,6 +460,12 @@ class LuizaApp(App[None]):
         border: solid #F44336;
         color: #B71C1C;
         background: #fff0f0;
+    }
+
+    .bubble-row {
+        align: center middle;
+        width: 1fr;
+        height: auto;
     }
 
     #hint {
@@ -481,11 +533,13 @@ class LuizaApp(App[None]):
             yield Canvas(W, H, canvas_color=WALL, id="rosto")
         yield Static(STATUS_MAP["idle"], id="status")
         yield Static("Você:", classes="label")
-        yield Static(" ", id="stt-text", classes="bubble")
+        with Horizontal(classes="bubble-row"):
+            yield Static(" ", id="stt-text", classes="bubble")
         yield Static("Luiza:", classes="label label-luiza")
-        yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
+        with Horizontal(classes="bubble-row"):
+            yield Static(" ", id="tts-text", classes="bubble bubble-luiza")
         yield Static("", id="ctx-usage")
-        yield Static("\\[Espaço/Enter] Falar  \\[Esc] Sair", id="hint")
+        yield Static("\[Espaço/Enter] Falar  \[Esc] Sair", id="hint")
 
     def on_mount(self):
         assistente._identidade_confirmada = False
