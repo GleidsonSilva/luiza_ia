@@ -15,8 +15,28 @@ def _get_model():
     global _EMB_CACHE
     if _EMB_CACHE is None:
         from sentence_transformers import SentenceTransformer
-        _EMB_CACHE = SentenceTransformer(MODELO_EMBEDDING, local_files_only=True)
+        try:
+            _EMB_CACHE = SentenceTransformer(MODELO_EMBEDDING, local_files_only=True)
+        except Exception:
+            _EMB_CACHE = SentenceTransformer(MODELO_EMBEDDING)
     return _EMB_CACHE
+
+
+def verificar_modelo_embedding() -> bool:
+    try:
+        from sentence_transformers import SentenceTransformer
+        SentenceTransformer(MODELO_EMBEDDING, local_files_only=True)
+        return True
+    except Exception:
+        try:
+            import os
+            old = os.environ.pop("HF_HUB_OFFLINE", None)
+            SentenceTransformer(MODELO_EMBEDDING)
+            if old is not None:
+                os.environ["HF_HUB_OFFLINE"] = old
+            return True
+        except Exception:
+            return False
 
 
 def embed(texto: str) -> np.ndarray:

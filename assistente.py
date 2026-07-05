@@ -269,7 +269,14 @@ resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
 _turno_idx = 0
-memoria_vetorial = memoria_rag.MemoriaVetorial()
+memoria_vetorial = None
+
+
+def _get_memoria_vetorial():
+    global memoria_vetorial
+    if memoria_vetorial is None:
+        memoria_vetorial = memoria_rag.MemoriaVetorial()
+    return memoria_vetorial
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -307,6 +314,27 @@ def transcrever(audio: np.ndarray) -> str:
         debug.log("vowel check failed")
         return ""
     return texto
+
+
+def _call_ollama(messages: list[dict], tools: list | None = None,
+                 max_retries: int = 2, timeout: int = 60) -> dict:
+    for attempt in range(max_retries + 1):
+        try:
+            r = requests.post(OLLAMA_URL, json={
+                "model": MODEL, "messages": messages, "tools": tools, "stream": False,
+            }, timeout=timeout)
+            r.raise_for_status()
+            body = r.json()
+            msg = body.get("message")
+            if not msg:
+                raise ValueError("Resposta do Ollama sem 'message'")
+            return msg
+        except (requests.RequestException, ValueError, json.JSONDecodeError) as e:
+            debug.log(f"Ollama attempt {attempt+1}/{max_retries+1} falhou: {e}")
+            if attempt < max_retries:
+                time.sleep(1 * (attempt + 1))
+            else:
+                raise
 
 
 def compactar_historico(historico_para_resumir: list[dict]) -> str:
@@ -401,6 +429,7 @@ def _executar_pergunta_matematica(args: dict) -> str:
 
 def perguntar(texto: str) -> str:
     global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, _turno_idx, memoria_vetorial
+    mv = _get_memoria_vetorial()
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
 
@@ -410,10 +439,10 @@ def perguntar(texto: str) -> str:
 
     t0 = time.time()
     try:
-        recuperado = memoria_vetorial.buscar(texto, k_fatos=4, k_turnos=3)
+        recuperado = mv.buscar(texto, k_fatos=4, k_turnos=3)
     except Exception:
         recuperado = {"fatos": "", "turnos": ""}
-    debug.log(f"memoria_vetorial.buscar em {time.time()-t0:.2f}s")
+    debug.log(f"mv.buscar em {time.time()-t0:.2f}s")
 
     if recuperado["fatos"]:
         system_content += f"\n\n### MEMORIA_LONGO_PRAZO\n{recuperado['fatos']}"
@@ -457,11 +486,12 @@ def perguntar(texto: str) -> str:
 
     while iters < max_iters:
         iters += 1
-        r = requests.post(OLLAMA_URL, json={
-            "model": MODEL, "messages": messages, "tools": tools, "stream": False
-        }, timeout=60)
-        body = r.json()
-        msg = body["message"]
+        try:
+            msg = _call_ollama(messages, tools=tools)
+        except Exception as e:
+            debug.log(f"Ollama falhou apos retries: {e}")
+            resposta = "Desculpe, tive um problema para pensar agora. Pode tentar de novo?"
+            break
         if msg.get("content"):
             resposta = remover_emojis(msg["content"]).strip()
         tool_calls = msg.get("tool_calls")
@@ -477,17 +507,21 @@ def perguntar(texto: str) -> str:
             name = fn["name"]
             args = fn.get("arguments", {})
             if isinstance(args, str):
-                args = json.loads(args)
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    debug.log(f"Falha ao parsear arguments da tool '{name}': {args}")
+                    continue
 
             result = ""
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
                 memoria.adicionar_fato(mem, "nome", args["nome"])
-                memoria_vetorial.indexar_fato("nome", args["nome"])
+                mv.indexar_fato("nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
-                memoria_vetorial.indexar_fato(args["chave"], args["valor"])
+                mv.indexar_fato(args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
@@ -519,9 +553,9 @@ def perguntar(texto: str) -> str:
     historico.append({"role": "assistant", "content": resposta})
 
     try:
-        memoria_vetorial.indexar_turno("user", texto, turno_idx=_turno_idx)
+        mv.indexar_turno("user", texto, turno_idx=_turno_idx)
         _turno_idx += 1
-        memoria_vetorial.indexar_turno("assistant", resposta, turno_idx=_turno_idx)
+        mv.indexar_turno("assistant", resposta, turno_idx=_turno_idx)
         _turno_idx += 1
     except Exception:
         pass

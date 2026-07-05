@@ -1,4 +1,5 @@
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import requests
 from ddgs import DDGS
 
@@ -34,11 +35,15 @@ def buscar_clima(cidade: str) -> str:
 
 def buscar_web(consulta: str) -> str:
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.text(consulta, max_results=3, safesearch="moderate"))
+        with DDGS(timeout=5) as ddgs:
+            with ThreadPoolExecutor() as pool:
+                future = pool.submit(ddgs.text, consulta, max_results=3, safesearch="moderate")
+                results = future.result(timeout=10)
         if not results:
             return f"Nao encontrei nada sobre '{consulta}'."
         linhas = [f"- {r['title']}: {r['href']}" for r in results]
         return f"Resultados da busca por '{consulta}':\n" + "\n".join(linhas)
+    except TimeoutError:
+        return f"A busca por '{consulta}' excedeu o tempo limite."
     except Exception as e:
         return f"Erro ao buscar '{consulta}': {e}"

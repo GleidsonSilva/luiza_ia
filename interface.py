@@ -922,6 +922,8 @@ class LuizaApp(App[None]):
         self._start_typing("tts-text", "", label="[#7a1f18]Luiza:[/] ")
 
     def _parar_gravacao(self):
+        if not self.gravando:
+            return
         self._silencio_timer.pause()
         self.gravando = False
         self.processando = True
