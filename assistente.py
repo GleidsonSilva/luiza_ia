@@ -35,7 +35,7 @@ SYSTEM_PROMPT = """### PERSONA
 Voce eh a Luiza, uma amiga de 8 anos.
 Voce gosta de conversar e fazer amizades.
 NUNCA se comporte como assistente ou robo.
-Nao use emojis ou simbolos.
+Nao use emojis ou simbolos. Nenhum emoji. Nunca.
 
 ### COMO FALAR
 - Fale igual uma crianca: frases curtas, palavras simples
@@ -154,6 +154,8 @@ historico = []
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
+_turno_idx = 0
+memoria_vetorial = memoria_rag.MemoriaVetorial()
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -228,13 +230,25 @@ def _resolver_tool_output(content: str) -> str:
 
 
 def perguntar(texto: str) -> str:
-    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status
+    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, _turno_idx, memoria_vetorial
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
 
-    memoria_raw = memoria.formatar_para_prompt(mem)
-    if memoria_raw:
-        system_content += f"\n\n### IDENTIDADE\n{memoria_raw}"
+    memoria_recuperada = memoria_rag.recuperar_fatos_relevantes(mem, texto, limite=5)
+    if memoria_recuperada:
+        system_content += f"\n\n### MEMORIA\n{memoria_recuperada}"
+
+    t0 = time.time()
+    try:
+        recuperado = memoria_vetorial.buscar(texto, k_fatos=4, k_turnos=3)
+    except Exception:
+        recuperado = {"fatos": "", "turnos": ""}
+    debug.log(f"memoria_vetorial.buscar em {time.time()-t0:.2f}s")
+
+    if recuperado["fatos"]:
+        system_content += f"\n\n### MEMORIA_LONGO_PRAZO\n{recuperado['fatos']}"
+    if recuperado["turnos"]:
+        system_content += f"\n\n### CONVERSAS_ANTERIORES\n{recuperado['turnos']}"
 
     if resumo_sessao:
         system_content += f"\n\n### RESUMO_SESSAO\n{resumo_sessao}"
@@ -299,9 +313,11 @@ def perguntar(texto: str) -> str:
             if name == "lembrar_nome" and args.get("nome"):
                 _identidade_confirmada = True
                 memoria.adicionar_fato(mem, "nome", args["nome"])
+                memoria_vetorial.indexar_fato("nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
             elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
+                memoria_vetorial.indexar_fato(args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
             elif name == "buscar_clima" and args.get("cidade"):
                 result = contexto.buscar_clima(args["cidade"])
@@ -327,6 +343,14 @@ def perguntar(texto: str) -> str:
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})
+
+    try:
+        memoria_vetorial.indexar_turno("user", texto, turno_idx=_turno_idx)
+        _turno_idx += 1
+        memoria_vetorial.indexar_turno("assistant", resposta, turno_idx=_turno_idx)
+        _turno_idx += 1
+    except Exception:
+        pass
 
     max_hist = MAX_HISTORICO_TURNOS * 2
     if len(historico) > max_hist:
