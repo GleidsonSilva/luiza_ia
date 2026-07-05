@@ -1038,6 +1038,8 @@ class LuizaApp(App[None]):
             debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
+            time.sleep(1)
+
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
 

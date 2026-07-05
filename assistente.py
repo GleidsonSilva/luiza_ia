@@ -574,6 +574,17 @@ def perguntar(texto: str) -> str:
     return resposta
 
 
+def _apply_fade(audio: np.ndarray, sr: int) -> np.ndarray:
+    audio = audio.copy()
+    fade_in = int(sr * 0.005)
+    fade_out = int(sr * 0.02)
+    if len(audio) > fade_in > 0:
+        audio[:fade_in] *= np.linspace(0, 1, fade_in)
+    if len(audio) > fade_out > 0:
+        audio[-fade_out:] *= np.linspace(1, 0, fade_out)
+    return audio
+
+
 def falar(texto: str):
     global stream
     was_streaming = stream is not None
@@ -592,6 +603,7 @@ def falar(texto: str):
 
     try:
         samples, sr = kokoro.create(texto, voice="pf_dora", speed=1.0, lang="pt-br")
+        samples = _apply_fade(samples, sr)
     except Exception as e:
         debug.log(f"falar: kokoro.create falhou: {e}")
         if was_streaming:
@@ -602,7 +614,6 @@ def falar(texto: str):
                 debug.log(f"falar: erro ao reiniciar stream: {e}")
         return
 
-    sd.stop()
     debug.log(f"falar: iniciando playback, samples={len(samples)}")
     t0 = time.time()
 
@@ -617,6 +628,10 @@ def falar(texto: str):
         end = idx + frames
         chunk = samples[idx:end]
         if len(chunk) < frames:
+            fade_n = min(len(chunk), 64)
+            if fade_n > 0:
+                chunk = chunk.copy()
+                chunk[-fade_n:] *= np.linspace(1, 0, fade_n)
             outdata[:len(chunk), 0] = chunk
             outdata[len(chunk):, 0] = 0
             playback_done.set()
