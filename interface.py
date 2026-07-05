@@ -562,14 +562,9 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         if expressao == "falando":
             _barras_audio(c, rms=audio_rms, now=now)
 
-    if piscando == 2:
+    if piscando >= 1:
         _olho_fechado(c, eye_l, eye_y - 1)
         _olho_fechado(c, eye_r, eye_y - 1)
-    elif piscando == 1:
-        for side_x, side_y in [(eye_l, eye_y), (eye_r, eye_y)]:
-            for ox in range(-6, 7):
-                oy = (ox * ox) // 7
-                c.set_pixel(side_x + ox, side_y + oy, SOBRANCELHA)
 
 
 class LuizaApp(App[None]):
