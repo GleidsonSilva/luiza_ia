@@ -112,7 +112,6 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0):
     elif estilo == "happy":
         _filled_circle(c, cx, cy, 3, OLHO)
         c.set_pixel(cx + 1, cy - 1, BRANCO)
-        c.draw_line(cx - 5, cy + 5, cx + 5, cy + 5, SOBRANCELHA)
     elif estilo == "focused":
         _filled_circle(c, cx + fdx, cy + fdy, 2, OLHO)
     elif estilo == "up":
