@@ -354,19 +354,15 @@ def _lua_estrelas(c, now=0.0):
         c.set_pixel(sx, sy + 2, star_color)
         c.set_pixel(sx + 1, sy - 1, star_color)
 
-SPINNER_POS = [
-    (0, -3), (2, -2), (3, 0), (2, 2),
-    (0, 3), (-2, 2), (-3, 0), (-2, -2),
-]
-
-def _spinner(c, frame):
-    sx, sy = 110, 70
-    for i, (dx, dy) in enumerate(SPINNER_POS):
-        d = abs(i - frame)
-        dist = min(d, 8 - d)
-        brightness = max(40, 255 - dist * 30)
-        cor = Color(brightness, brightness, brightness)
-        _filled_circle(c, sx + dx, sy + dy, 1, cor)
+def _pensamento(c, bubbles):
+    for bx, by, br, age in bubbles:
+        progress = age / 16.0
+        b = int(255 - progress * 180)
+        b = max(60, b)
+        alpha = int(255 - progress * 200)
+        alpha = max(55, alpha)
+        cor = Color(b, b, b, alpha)
+        _filled_circle(c, int(bx), int(by), int(br + 0.5), cor)
 
 def _barras_audio(c, rms=0.0):
     bars_per_side = 4
@@ -429,7 +425,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, spinner_frame=0, bocejando=False, bocejo_frame=0):
+def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, bubbles=None, bocejando=False, bocejo_frame=0):
     if now is None:
         now = time.time()
     breath_y = int(0.5 * np.sin(now * 2.1))
@@ -490,11 +486,12 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "surprised")
-        _spinner(c, spinner_frame)
+        if bubbles:
+            _pensamento(c, bubbles)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
         dirs = [(-1,-2), (1,-2), (-1,2), (1,2)]
-        fdx, fdy = dirs[(spinner_frame // 10) % 4]
+        fdx, fdy = dirs[(int(time.time() * 2)) % 4]
         _olho(c, eye_l, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _olho(c, eye_r, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _palpebra(c, eye_l, eye_y)
@@ -502,7 +499,8 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "slight")
-        _spinner(c, spinner_frame)
+        if bubbles:
+            _pensamento(c, bubbles)
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
         _olho(c, eye_l, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
@@ -675,7 +673,8 @@ class LuizaApp(App[None]):
         self._audio_rms = 0.0
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
-        self._spinner_frame = 0
+        self._bubbles = []
+        self._bubble_frame = 0
         self._bocejando = False
 
     def compose(self) -> ComposeResult:
@@ -696,7 +695,7 @@ class LuizaApp(App[None]):
                                              pause=True)
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
                                                   pause=True)
-        self._spinner_timer = self.set_interval(0.08, self._avancar_spinner,
+        self._bubble_timer = self.set_interval(0.08, self._avancar_bubble,
                                                   pause=True)
         self._agendar_piscar()
         self._agendar_olhar()
@@ -776,8 +775,18 @@ class LuizaApp(App[None]):
             self._mouth_target_h = min(7, self._mouth_target_h)
             self._atualizar_rosto()
 
-    def _avancar_spinner(self):
-        self._spinner_frame = (self._spinner_frame + 1) % 8
+    def _avancar_bubble(self):
+        new = []
+        for bx, by, br, age in self._bubbles:
+            age += 1
+            if age >= 16:
+                continue
+            new.append((bx, by - 1, min(br + 0.3, 2.5), age))
+        self._bubbles = new
+        self._bubble_frame += 1
+        if self._bubble_frame % 5 == 0 and len(self._bubbles) < 5:
+            rx = random.randint(-3, 3)
+            self._bubbles.append((FX + 10 + rx, FY - 28, 1.0, 0))
         if self.expressao in ("transcrevendo", "pensando"):
             self._atualizar_rosto()
 
@@ -790,7 +799,7 @@ class LuizaApp(App[None]):
                            self._piscando, self._olho_dir,
                            audio_rms=self._audio_rms, now=time.time(),
                            mouth_h=self._mouth_h if self.expressao == "falando" else None,
-                           spinner_frame=self._spinner_frame,
+                           bubbles=self._bubbles if self.expressao in ("transcrevendo", "pensando") else None,
                            bocejando=self._bocejando,
                            bocejo_frame=self._bocejo_frame if self._bocejando else 0)
 
@@ -817,13 +826,16 @@ class LuizaApp(App[None]):
                 pass
         if expressao == "falando":
             self._boca_delay_timer = self.set_timer(0.5, self._iniciar_animacao_boca)
-            self._spinner_timer.pause()
+            self._bubble_timer.pause()
         elif expressao in ("transcrevendo", "pensando"):
-            self._spinner_timer.resume()
+            self._bubbles = []
+            self._bubble_frame = 0
+            self._bubble_timer.resume()
             self._boca_timer.pause()
         else:
+            self._bubbles = []
             self._boca_timer.pause()
-            self._spinner_timer.pause()
+            self._bubble_timer.pause()
 
     def _start_typing(self, widget_id, text, speed=0.04, is_error=False, label=""):
         self._cancel_typing(widget_id)
