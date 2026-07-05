@@ -355,18 +355,24 @@ def _lua_estrelas(c, now=0.0):
         c.set_pixel(sx + 1, sy - 1, star_color)
 
 def _barras_audio(c, rms=0.0):
-    bx, by = 100, 50
-    base_heights = [2, 3, 4, 3]
-    t = time.time() * 8
-    for i, base_h in enumerate(base_heights):
+    num_bars = 8
+    bar_width = 2
+    gap = 1
+    base_h = 3
+    y = 58
+    total_width = num_bars * bar_width + (num_bars - 1) * gap
+    start_x = FX - total_width // 2
+    t = time.time() * 6
+    for i in range(num_bars):
         phase = t + i * 1.2
         wave = np.sin(phase) * 0.5 + 0.5
         audio_influence = min(1.0, rms * 40.0)
-        h = int(base_h + wave * 2 + audio_influence * 2)
-        h = max(1, min(6, h))
-        for y in range(by - h, by + h):
-            for x in range(bx + i * 4, bx + i * 4 + 2):
-                c.set_pixel(x, y, STAR)
+        h = int(base_h + wave * 2 + audio_influence * 4)
+        h = max(1, min(12, h))
+        x = start_x + i * (bar_width + gap)
+        for dy in range(-h, h + 1):
+            for dx in range(bar_width):
+                c.set_pixel(x + dx, y + dy, STAR)
 
   
 def _corpo(c):
