@@ -354,6 +354,20 @@ def _lua_estrelas(c, now=0.0):
         c.set_pixel(sx, sy + 2, star_color)
         c.set_pixel(sx + 1, sy - 1, star_color)
 
+SPINNER_POS = [
+    (0, -3), (2, -2), (3, 0), (2, 2),
+    (0, 3), (-2, 2), (-3, 0), (-2, -2),
+]
+
+def _spinner(c, frame):
+    sx, sy = 110, 70
+    for i, (dx, dy) in enumerate(SPINNER_POS):
+        d = abs(i - frame)
+        dist = min(d, 8 - d)
+        brightness = max(40, 255 - dist * 30)
+        cor = Color(brightness, brightness, brightness)
+        _filled_circle(c, sx + dx, sy + dy, 1, cor)
+
 def _vu_meter(c, rms):
     bx, by = FX, 61
     half_w = 30
@@ -434,7 +448,7 @@ EYE_R = FX + 16
 EYE_Y = FY - 10
 MOUTH_Y = FY + 12
 
-def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None):
+def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, spinner_frame=0):
     if now is None:
         now = time.time()
     c.clear()
@@ -486,6 +500,18 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=False, olho_dir=(0,0), aud
         _blush(c)
         _nariz(c)
         _boca(c, FX, MOUTH_Y, "surprised")
+        _spinner(c, spinner_frame)
+    elif expressao == "pensando":
+        _sobrancelhas(c, "franzida", t=now)
+        fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
+        _olho(c, EYE_L, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
+        _olho(c, EYE_R, EYE_Y, "focused", fdx, fdy, rms=0.0, t=now)
+        _palpebra(c, EYE_L, EYE_Y)
+        _palpebra(c, EYE_R, EYE_Y)
+        _blush(c)
+        _nariz(c)
+        _boca(c, FX, MOUTH_Y, "slight")
+        _spinner(c, spinner_frame)
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
         _olho(c, EYE_L, EYE_Y, "happy_talk", 0, 0, rms=audio_rms, t=now)
@@ -653,6 +679,7 @@ class LuizaApp(App[None]):
         self._audio_rms = 0.0
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
+        self._spinner_frame = 0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -671,6 +698,8 @@ class LuizaApp(App[None]):
         self._boca_timer = self.set_interval(1 / 18, self._avancar_boca,
                                              pause=True)
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
+                                                  pause=True)
+        self._spinner_timer = self.set_interval(0.08, self._avancar_spinner,
                                                   pause=True)
         self._agendar_piscar()
         self._agendar_olhar()
@@ -708,6 +737,11 @@ class LuizaApp(App[None]):
             self._mouth_target_h = min(7, self._mouth_target_h)
             self._atualizar_rosto()
 
+    def _avancar_spinner(self):
+        self._spinner_frame = (self._spinner_frame + 1) % 8
+        if self.expressao in ("transcrevendo", "pensando"):
+            self._atualizar_rosto()
+
     def _atualizar_rosto(self):
         if self.expressao == "falando" and self._mouth_target_h is not None:
             self._mouth_h += (self._mouth_target_h - self._mouth_h) * 0.55
@@ -716,7 +750,8 @@ class LuizaApp(App[None]):
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
                            self._piscando, self._olho_dir,
                            audio_rms=self._audio_rms, now=time.time(),
-                           mouth_h=self._mouth_h if self.expressao == "falando" else None)
+                           mouth_h=self._mouth_h if self.expressao == "falando" else None,
+                           spinner_frame=self._spinner_frame)
 
     def _mudar_expressao(self, expressao):
         if self._boca_delay_timer:
@@ -736,8 +771,13 @@ class LuizaApp(App[None]):
                 pass
         if expressao == "falando":
             self._boca_delay_timer = self.set_timer(0.5, self._iniciar_animacao_boca)
+            self._spinner_timer.pause()
+        elif expressao in ("transcrevendo", "pensando"):
+            self._spinner_timer.resume()
+            self._boca_timer.pause()
         else:
             self._boca_timer.pause()
+            self._spinner_timer.pause()
 
     def _start_typing(self, widget_id, text, speed=0.04, is_error=False, label=""):
         self._cancel_typing(widget_id)
