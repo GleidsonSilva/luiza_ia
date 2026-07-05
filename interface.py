@@ -213,6 +213,10 @@ def _boca_dinamica(c, cx, cy, base_forma, rms, frame):
     h = min(7, h)
     w = max(3, min(6, int(h * 0.9 + rms * 6)))
     _boca_retang(c, cx, cy, w, h, inner=rms > 0.04)
+    if h >= 4:
+        for sign in (-1, 1):
+            c.set_pixel(cx + sign * (w + 1), cy - 1, BOCA_COR)
+            c.set_pixel(cx + sign * (w + 2), cy - 2, BOCA_COR)
 
 def _blush(c):
     _filled_circle(c, FX - 22, FY + 2, 3, BLUSH)
@@ -506,8 +510,13 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         if mouth_h is not None:
+            mh = int(mouth_h)
             w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
-            _boca_retang(c, FX, mouth_y, w, int(mouth_h), inner=audio_rms > 0.04)
+            _boca_retang(c, FX, mouth_y, w, mh, inner=audio_rms > 0.04)
+            if mh >= 4:
+                for sign in (-1, 1):
+                    c.set_pixel(FX + sign * (w + 1), mouth_y - 1, BOCA_COR)
+                    c.set_pixel(FX + sign * (w + 2), mouth_y - 2, BOCA_COR)
         else:
             _boca_dinamica(c, FX, mouth_y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
         _barras_audio(c, rms=audio_rms)
