@@ -211,7 +211,7 @@ def _boca_dinamica(c, cx, cy, base_forma, rms, frame):
     base = _boca_altura(base_forma)
     h = max(2, base + int(rms * 14))
     h = min(7, h)
-    w = max(3, min(6, int(h * 0.9 + rms * 6)))
+    w = max(3, min(8, int(h * 1.2 + rms * 8)))
     _boca_retang(c, cx, cy, w, h, inner=rms > 0.04)
     if h >= 4:
         for sign in (-1, 1):
@@ -511,7 +511,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _nariz(c)
         if mouth_h is not None:
             mh = int(mouth_h)
-            w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
+            w = max(3, min(8, int(mouth_h * 1.2 + audio_rms * 8)))
             _boca_retang(c, FX, mouth_y, w, mh, inner=audio_rms > 0.04)
             if mh >= 4:
                 for sign in (-1, 1):
