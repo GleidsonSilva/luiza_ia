@@ -144,6 +144,11 @@ def _olho(c, cx, cy, estilo, fdx=0, fdy=0, rms=0.0, t=0.0):
         c.set_pixel(cx + 3 + fdx, cy - 2 + fdy, BRANCO)
         c.set_pixel(cx + 2 + fdx, cy - 2 + fdy, SOBRANCELHA)
         c.set_pixel(cx - 1 + fdx, cy - 2 + fdy, SOBRANCELHA)
+    CILIO = Color(70, 45, 30)
+    for ox in range(-4, 6, 2):
+        dy = int(math.sqrt(max(0, 36 - ox * ox)))
+        c.set_pixel(cx + ox, cy - dy - 1, CILIO)
+        c.set_pixel(cx + ox, cy - dy - 2, CILIO)
 
 def _boca_curva(c, cx, cy, abertura, largura):
     for dx in range(-largura, largura + 1):
