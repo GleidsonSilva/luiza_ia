@@ -476,7 +476,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _nariz(c)
         _boca(c, FX, mouth_y, boca_forma)
     elif expressao == "ouvindo":
-        _sobrancelhas(c, "animada", t=now)
+        _sobrancelhas(c, "feliz", t=now)
         _olho(c, eye_l, eye_y, "normal", rms=audio_rms, t=now)
         _olho(c, eye_r, eye_y, "normal", rms=audio_rms, t=now)
         _palpebra(c, eye_l, eye_y)
@@ -507,10 +507,10 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _boca(c, FX, mouth_y, "slight")
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
-        _olho(c, eye_l, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
-        _olho(c, eye_r, eye_y, "happy_talk", 0, 0, rms=audio_rms, t=now)
-        _palpebra(c, eye_l, eye_y, soft=True, squint=1)
-        _palpebra(c, eye_r, eye_y, soft=True, squint=1)
+        _olho(c, eye_l, eye_y, "happy", 0, 0, rms=audio_rms, t=now)
+        _olho(c, eye_r, eye_y, "happy", 0, 0, rms=audio_rms, t=now)
+        _palpebra(c, eye_l, eye_y, soft=True)
+        _palpebra(c, eye_r, eye_y, soft=True)
         _blush(c)
         _nariz(c)
         if mouth_h is not None:
