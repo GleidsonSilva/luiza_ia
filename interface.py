@@ -927,7 +927,14 @@ class LuizaApp(App[None]):
         self.processando = True
         self._mudar_expressao("transcrevendo")
         with assistente.buf_lock:
-            audio = np.concatenate(assistente.buf[self.recording_idx:])
+            chunks = assistente.buf[self.recording_idx:]
+            if not chunks:
+                debug.log("_parar_gravacao: buf vazio, abortando")
+                self.processando = False
+                self.recording_idx = 0
+                self._mudar_expressao("idle")
+                return
+            audio = np.concatenate(chunks)
             del assistente.buf[:self.recording_idx]
             self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),
