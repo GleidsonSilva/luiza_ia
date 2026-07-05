@@ -1,6 +1,8 @@
 .venv/
+venv/
 debug/
 __pycache__/
+*.pyc
 *.wav
 memoria.json
 debug.log

@@ -253,7 +253,7 @@ def _sobrancelha_traca(c, x1, x2, y1, y2, espessura=1):
 def _sobrancelhas(c, estado, t=0.0, rms=0.0):
     sy = FY - 16
     if estado == "neutra":
-        oy_neutra = int(1.5 * np.sin(t * 0.7))
+        oy_neutra = int(0.6 * np.sin(t * 0.7))
         for ox in range(-7, 8):
             oy = (ox * ox) // 20
             c.set_pixel(FX - 16 + ox, sy - 3 + oy + oy_neutra, SOBRANCELHA)
@@ -369,7 +369,7 @@ def _spinner(c, frame):
         _filled_circle(c, sx + dx, sy + dy, 1, cor)
 
 def _vu_meter(c, rms):
-    bx, by = FX, 61
+    bx, by = FX, 66
     half_w = 30
     fill = min(1.0, rms * 50)
     filled_px = int(2 * half_w * fill)
@@ -383,10 +383,9 @@ def _vu_meter(c, rms):
             else:
                 cor = Color(220, 80, 80)
         else:
-            cor = Color(50, 50, 50)
-        for dy in range(4):
+            cor = Color(40, 40, 40)
+        for dy in range(3):
             c.set_pixel(x, by + dy, cor)
-    c.draw_rectangle(bx - half_w, by, bx + half_w, by + 3, Color(120, 120, 120))
 
 def _barras_audio(c, rms=0.0):
     bars_per_side = 4
@@ -451,21 +450,18 @@ MOUTH_Y = FY + 12
 def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_rms=0.0, now=None, mouth_h=None, spinner_frame=0, bocejando=False, bocejo_frame=0):
     if now is None:
         now = time.time()
-    breath_y = int(0.7 * np.sin(now * 2.1))
-    tilt_x = int(0.8 * np.sin(now * 1.3))
-    fxc = FX + tilt_x
-    fyc = FY
-    eye_l = fxc - 16
-    eye_r = fxc + 16
-    eye_y = fyc - 10
-    mouth_y = fyc + 12
+    breath_y = int(0.5 * np.sin(now * 2.1))
+    eye_l = FX - 16
+    eye_r = FX + 16
+    eye_y = FY - 10
+    mouth_y = FY + 12
     c.clear()
     _tapete(c)
     _janela(c, now=now)
     _lua_estrelas(c, now=now)
     _corpo(c)
     _cabelo_atras(c)
-    _filled_oval(c, fxc, fyc + breath_y, 36, 28, PELE)
+    _filled_oval(c, FX, FY + breath_y, 36, 28, PELE)
     _franja(c)
     _lacinho(c)
 
@@ -492,7 +488,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
             _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, boca_forma)
+        _boca(c, FX, mouth_y, boca_forma)
     elif expressao == "ouvindo":
         _sobrancelhas(c, "animada", t=now)
         _olho(c, eye_l, eye_y, "normal", rms=audio_rms, t=now)
@@ -501,7 +497,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "slight")
+        _boca(c, FX, mouth_y, "slight")
         _vu_meter(c, rms=audio_rms)
         _barras_audio(c, rms=audio_rms)
     elif expressao == "transcrevendo":
@@ -512,7 +508,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y - 3)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "surprised")
+        _boca(c, FX, mouth_y, "surprised")
         _spinner(c, spinner_frame)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
@@ -523,7 +519,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "slight")
+        _boca(c, FX, mouth_y, "slight")
         _spinner(c, spinner_frame)
     elif expressao == "falando":
         _sobrancelhas(c, "feliz", t=now)
@@ -535,9 +531,9 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _nariz(c)
         if mouth_h is not None:
             w = max(3, min(6, int(mouth_h * 0.9 + audio_rms * 6)))
-            _boca_retang(c, fxc, mouth_y, w, int(mouth_h), inner=audio_rms > 0.04)
+            _boca_retang(c, FX, mouth_y, w, int(mouth_h), inner=audio_rms > 0.04)
         else:
-            _boca_dinamica(c, fxc, mouth_y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
+            _boca_dinamica(c, FX, mouth_y, MOUTH_CYCLE[frame_boca], audio_rms, frame_boca)
         _barras_audio(c, rms=audio_rms)
     elif expressao == "triste":
         _sobrancelhas(c, "triste", t=now)
@@ -547,7 +543,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "slight")
+        _boca(c, FX, mouth_y, "slight")
     elif expressao == "brava":
         _sobrancelhas(c, "brava", t=now)
         _olho(c, eye_l, eye_y, "focused", fdx=-1, fdy=-1, rms=0.0, t=now)
@@ -556,7 +552,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "slight")
+        _boca(c, FX, mouth_y, "slight")
     elif expressao == "animada":
         _sobrancelhas(c, "animada", t=now)
         _olho(c, eye_l, eye_y, "happy", rms=max(audio_rms, 0.15), t=now)
@@ -565,7 +561,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y)
         _blush(c)
         _nariz(c)
-        _boca(c, fxc, mouth_y, "smile")
+        _boca(c, FX, mouth_y, "smile")
 
     if piscando == 2:
         _olho_fechado(c, eye_l, eye_y - 1)
