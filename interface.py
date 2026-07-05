@@ -198,6 +198,8 @@ def _boca_retang(c, cx, cy, w, h, inner=False, curve=True):
 
 def _boca(c, cx, cy, forma):
     if forma == "smile":
+        _boca_curva(c, cx, cy, 7, 13, assimetrico=1)
+    elif forma == "smile_wide":
         _boca_curva(c, cx, cy, 7, 15, assimetrico=1)
     elif forma == "slight":
         _boca_curva(c, cx, cy, 4, 10)
@@ -581,7 +583,7 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _palpebra(c, eye_r, eye_y, soft=True)
         _blush(c)
         _nariz(c)
-        _boca(c, FX, mouth_y, "smile")
+        _boca(c, FX, mouth_y, "smile_wide")
 
     if trans_frame >= 0 and trans_frame < trans_total * 0.4:
         _olho_fechado(c, eye_l, eye_y - 1)
