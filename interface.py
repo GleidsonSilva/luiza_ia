@@ -368,32 +368,14 @@ def _spinner(c, frame):
         cor = Color(brightness, brightness, brightness)
         _filled_circle(c, sx + dx, sy + dy, 1, cor)
 
-def _vu_meter(c, rms):
-    bx, by = FX, 66
-    half_w = 30
-    fill = min(1.0, rms * 50)
-    filled_px = int(2 * half_w * fill)
-    for dx in range(-half_w, half_w + 1):
-        x = bx + dx
-        if dx <= -half_w + filled_px:
-            if rms < 0.01:
-                cor = Color(100, 180, 100)
-            elif rms < 0.05:
-                cor = Color(180, 220, 80)
-            else:
-                cor = Color(220, 80, 80)
-        else:
-            cor = Color(40, 40, 40)
-        for dy in range(3):
-            c.set_pixel(x, by + dy, cor)
-
 def _barras_audio(c, rms=0.0):
     bars_per_side = 4
     bar_w = 2
     gap = 1
     base_h = 3
     y = 55
-    t = time.time() * 6
+    frame = int(time.time() * 18)
+    t = (frame // 10) * 1.2
     group_w = bars_per_side * bar_w + (bars_per_side - 1) * gap
     for side, sign in [("L", -1), ("R", 1)]:
         cx = FX + sign * 29
@@ -498,7 +480,6 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _blush(c)
         _nariz(c)
         _boca(c, FX, mouth_y, "slight")
-        _vu_meter(c, rms=audio_rms)
         _barras_audio(c, rms=audio_rms)
     elif expressao == "transcrevendo":
         _sobrancelhas(c, "curiosa", t=now)
@@ -512,7 +493,8 @@ def desenhar_rosto(c, expressao, frame_boca, piscando=0, olho_dir=(0,0), audio_r
         _spinner(c, spinner_frame)
     elif expressao == "pensando":
         _sobrancelhas(c, "franzida", t=now)
-        fdx, fdy = random.choice([(-1,-2), (1,-2), (-1,2), (1,2)])
+        dirs = [(-1,-2), (1,-2), (-1,2), (1,2)]
+        fdx, fdy = dirs[(spinner_frame // 10) % 4]
         _olho(c, eye_l, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _olho(c, eye_r, eye_y, "focused", fdx, fdy, rms=0.0, t=now)
         _palpebra(c, eye_l, eye_y)
