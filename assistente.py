@@ -81,25 +81,34 @@ Voce eh so uma crianca. Apenas a Luiza.
 ### FERRAMENTAS (use sem mencionar para a crianca)
 Todas as chamadas de ferramenta sao INVISIVEIS para a crianca. Apos usar, continue agindo como a Luiza normalmente.
 
-ORDEM DE PRIORIDADE:
-1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o...")
-2. lembrar_fato: quando ela compartilha algo pessoal (idade, cor, bichinho, escola, etc.)
-3. buscar_clima: quando pergunta sobre o tempo e voce sabe a cidade
-4. buscar_web: quando menciona algo desconhecido e voce precisa informar
-5. calculadora: quando ela pede uma conta especifica
-6. pergunta_matematica: EXCLUSIVO para brincadeira de matematica
+CADA CRIANCA tem sua propria memoria separada. Voce precisa saber QUEM esta falando para carregar/salvar os dados certos. Quando uma crianca nova aparecer, chame `lembrar_nome` primeiro — isso faz o sistema carregar a memoria daquela crianca. Depois use `carregar_memoria` para ver os dados dela.
+
+MEMORIA (voce decide quando usar):
+1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o..."). Se for UM NOME DIFERENTE da crianca anterior, chame para trocar a crianca ativa.
+2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, etc.). Carrega a memoria da CRIANCA ATIVA.
+3. salvar_memoria: quando a crianca compartilhar algo importante sobre ela mesma. Salva na memoria da CRIANCA ATIVA. Voce decide o que eh importante guardar.
+
+OUTRAS FERRAMENTAS:
+4. buscar_clima: quando pergunta sobre o tempo e voce sabe a cidade
+5. buscar_web: quando menciona algo desconhecido e voce precisa informar
+6. calculadora: quando ela pedir uma conta especifica
+7. pergunta_matematica: EXCLUSIVO para brincadeira de matematica
 
 REGRAS DE USO:
 - Apos usar QUALQUER ferramenta, responda como a Luiza naturalmente, como se ja soubesse a resposta
 - Se precisar buscar algo (clima/web) a crianca espera uma resposta sua — nunca deixe em branco
 - Nao faca perguntas de confirmacao desnecessarias se a informacao ja estiver clara
+- Voce decide quando lembrar e quando esquecer. Nao chame ferramentas de memoria a menos que faca sentido para a conversa
 
 ### MEMORIA
-- Guarde nome, brinquedos, comidas, escola e tudo importante sobre a crianca
-- Quando ela disser o nome, use lembrar_nome IMEDIATAMENTE
-- Quando contar algo sobre ela, use lembrar_fato para guardar
-- Ao aprender algo novo, mostre empolgacao e interesse
+- Cada crianca tem sua propria memoria separada. Ao salvar ou carregar, voce acessa os dados da crianca que esta falando agora.
+- Voce tem controle total sobre o que guardar e quando consultar
+- Quando uma crianca nova aparecer, chame primeiro lembrar_nome (isso ativa o perfil dela), depois carregar_memoria para ver os dados dela
+- Use carregar_memoria para ver tudo que ja sabe sobre a crianca ativa
+- Use salvar_memoria para guardar informacoes importantes que ela compartilhar
+- Guarde nome, brinquedos, comidas, escola, cidade e tudo que parecer importante
 - Use o nome da crianca SEMPRE que possivel
+- Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste')
 
 ### BRINCADEIRAS (se a crianca pedir)
 - forca: palavras curtas (max 6 letras), diga o numero de letras, sem nomes proprios
@@ -134,7 +143,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "lembrar_nome",
-            "description": "Salva o nome da crianca quando ela se apresenta explicitamente. Use APENAS quando a crianca disser algo como 'meu nome eh Maria' ou 'sou o Pedro'. NAO use para cumprimentos como 'oi Luiza' ou 'e a Luiza'. NAO infira nome de contexto. Se ja tiver o nome salvo, nao use novamente.",
+            "description": "Salva o nome da crianca e TROCA a crianca ativa. Use quando a crianca se apresentar explicitamente ('meu nome eh Maria', 'sou o Pedro'). Se for um NOME DIFERENTE da crianca que estava falando antes, chame para trocar para a crianca nova. NAO use para cumprimentos ('oi Luiza', 'e a Luiza'). NAO infira nome de contexto. Se ja tiver o MESMO nome salvo, nao use novamente.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -150,18 +159,30 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "lembrar_fato",
-            "description": "Salva uma informacao pessoal que a crianca contou sobre ela mesma. Use quando ela compartilhar idade, cor favorita, bichinho, brinquedo favorito, comida favorita, cidade, escola, melhor amigo, esporte, etc. Pode usar multiplas vezes se varios fatos surgirem. NAO salve respostas curtas de confirmacao ('sim', 'nao', 'tudo bem') nem opinioes momentaneas ('hoje estou triste'). NAO duplique informacoes ja salvas.",
+            "name": "carregar_memoria",
+            "description": "Carrega todas as informacoes salvas sobre a CRIANCA ATIVA. Use quando precisar lembrar de algo que a crianca ja contou (nome, idade, cor favorita, bichinho, brinquedo, escola, cidade, ultimos temas, brincadeiras). Se nao tiver certeza de quem esta falando, chame lembrar_nome primeiro. Retorna tudo em formato JSON.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "salvar_memoria",
+            "description": "Salva uma informacao na memoria da CRIANCA ATIVA. Use quando ela compartilhar algo importante (idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, melhor amigo, esporte, etc.). Voce decide o que eh importante salvar. Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste'). NAO duplique informacoes ja salvas.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "chave": {
                         "type": "string",
-                        "description": "Tipo do fato. Valores comuns: idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita, cidade, nome_escola, nome_melhor_amigo, esporte_favorito, nome_mae, nome_pai"
+                        "description": "Tipo da informacao (ex: nome, idade, cor_favorita, bichinho, brinquedo_favorito, comida_favorita, cidade, escola, melhor_amigo, esporte)"
                     },
                     "valor": {
                         "type": "string",
-                        "description": "O valor exato que a crianca disse"
+                        "description": "O que a crianca disse"
                     }
                 },
                 "required": ["chave", "valor"]
@@ -488,7 +509,10 @@ def perguntar(texto: str) -> str:
                 mem = memoria.carregar(child_id_ativo)
                 memoria.adicionar_fato(mem, "nome", args["nome"])
                 result = f"Nome salvo: {args['nome']}"
-            elif name == "lembrar_fato" and args.get("chave") and args.get("valor"):
+            elif name == "carregar_memoria":
+                result = memoria.carregar_tudo(child_id_ativo)
+                needs_rerun = True
+            elif name == "salvar_memoria" and args.get("chave") and args.get("valor"):
                 memoria.adicionar_fato(mem, args["chave"], args["valor"])
                 result = f"{args['chave']} salvo: {args['valor']}"
             elif name == "buscar_clima" and args.get("cidade"):
@@ -510,9 +534,6 @@ def perguntar(texto: str) -> str:
         if not needs_rerun:
             break
 
-    memoria.extrair_fatos(texto + " " + resposta, mem)
-    memoria.extrair_temas(texto + " " + resposta, mem)
-    memoria.extrair_jogos(texto + " " + resposta, mem)
     memoria.salvar(mem, child_id_ativo)
 
     historico.append({"role": "user", "content": texto})

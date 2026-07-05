@@ -1,4 +1,4 @@
-import json, os, re
+import json, os
 from typing import Optional
 
 MEMORIAS_DIR = "memorias"
@@ -33,10 +33,15 @@ def carregar(child_id: Optional[str] = None) -> dict:
     return {"crianca": {}, "topicos": [], "ultimos_temas": [], "historico_jogos": []}
 
 
+def _dedup_ordenedado(lista: list) -> list:
+    vistos = set()
+    return [x for x in lista if not (x in vistos or vistos.add(x))]
+
+
 def salvar(mem: dict, child_id: Optional[str] = None):
-    mem["topicos"] = mem.get("topicos", [])[-LIMITE_TOPICOS:]
-    mem["historico_jogos"] = mem.get("historico_jogos", [])[-LIMITE_JOGOS:]
-    mem["ultimos_temas"] = mem.get("ultimos_temas", [])[-LIMITE_TEMAS:]
+    mem["topicos"] = _dedup_ordenedado(mem.get("topicos", []))[-LIMITE_TOPICOS:]
+    mem["historico_jogos"] = _dedup_ordenedado(mem.get("historico_jogos", []))[-LIMITE_JOGOS:]
+    mem["ultimos_temas"] = _dedup_ordenedado(mem.get("ultimos_temas", []))[-LIMITE_TEMAS:]
     path = _path(child_id)
     with open(path, "w") as f:
         json.dump(mem, f, ensure_ascii=False, indent=2)
@@ -67,46 +72,11 @@ def formatar_para_prompt(mem: dict) -> str:
     return " ".join(partes) if partes else ""
 
 
-def extrair_fatos(texto: str, mem: dict) -> dict:
-    c = mem["crianca"]
-    padroes = [
-        (r"(?:meu nome eh|me chamo|eu sou o?)\s*([^\s.!?,]+(?:\s[^\s.!?,]+)?)", "nome"),
-        (r"(\d+)\s*anos", "idade"),
-        (r"(?:gosto|amo|adoro)\s+(?:da?\s+)?cor\s+(\w+)", "cor_favorita"),
-        (r"(?:tenho um?|meu bichinho|meu pet|meu cachorro|meu gato)\s*(?:chamado\s+)?(\w+)", "bichinho"),
-        (r"(?:meu brinquedo favorito|gosto de brincar com)\s*(.+?)(?:\.|,|$)", "brinquedo_favorito"),
-    ]
-    for padrao, chave in padroes:
-        if chave not in c or not c[chave]:
-            m = re.search(padrao, texto, re.IGNORECASE)
-            if m:
-                c[chave] = m.group(1).strip().capitalize()
-    return mem
-
-
-def extrair_temas(texto: str, mem: dict) -> dict:
-    temas_palavras = ["brincar", "jogar", "escola", "amigo", "familia", "filme", "musica",
-                      "desenho", "comida", "animal", "futebol", "boneca", "carrinho", "pintar",
-                      "ler", "viajar", "natureza", "super-heroi", "princesa", "dinossauro"]
-    encontrados = [p for p in temas_palavras if p in texto.lower()]
-    for t in encontrados:
-        if t not in mem["topicos"]:
-            mem["topicos"].append(t)
-    mem["ultimos_temas"] = (mem["ultimos_temas"] + encontrados)[-5:]
-    return mem
-
-
-def extrair_jogos(texto: str, mem: dict) -> dict:
-    jogos_conhecidos = ["forca", "adivinhacao", "20 perguntas",
-                        "historia coletiva", "detetive", "palavra secreta",
-                        "cadeia de palavras", "o que sou eu", "verdadeiro ou falso",
-                        "rima comigo", "categorias", "stop", "complete a frase"]
-    for j in jogos_conhecidos:
-        if j in texto.lower() and j not in mem["historico_jogos"]:
-            mem["historico_jogos"].append(j)
-    return mem
-
-
 def adicionar_fato(mem: dict, chave: str, valor: str) -> dict:
     mem["crianca"][chave] = valor.strip().capitalize()
     return mem
+
+
+def carregar_tudo(child_id: Optional[str] = None) -> str:
+    mem = carregar(child_id)
+    return json.dumps(mem, ensure_ascii=False, indent=2)
