@@ -175,10 +175,8 @@ def _boca(c, cx, cy, forma):
         _boca_retang(c, cx, cy, 7, 7)
 
 def _blush(c):
-    _filled_circle(c, FX - 22, FY + 2, 5, BLUSH)
-    _filled_circle(c, FX + 22, FY + 2, 5, BLUSH)
-    _filled_circle(c, FX - 22, FY + 2, 2, Color(255, 160, 190))
-    _filled_circle(c, FX + 22, FY + 2, 2, Color(255, 160, 190))
+    _filled_circle(c, FX - 22, FY + 2, 3, BLUSH)
+    _filled_circle(c, FX + 22, FY + 2, 3, BLUSH)
 
 def _palpebra(c, cx, cy):
     for ox in range(-6, 7):
