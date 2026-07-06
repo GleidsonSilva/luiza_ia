@@ -34,7 +34,7 @@ MIN_RMS_ENROLLMENT = 0.01
 COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 
 # Buffer de audio: limitado a ~60s para evitar consumo infinito de memoria
-BUF_MAX_CHUNKS = 960
+BUF_MAX_CHUNKS = 2880  # ~180s de audio; reduz poda agressiva e log spam
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
@@ -906,7 +906,6 @@ def _stream_callback(indata, frames, time, status):
             # Remove excesso de uma vez para minimizar lock contention
             excesso = len(buf) - BUF_MAX_CHUNKS
             del buf[:excesso]
-            debug.log(f"voice_id: buffer podado em {excesso} chunks (limit={BUF_MAX_CHUNKS})")
 
 
 def iniciar_stream():
