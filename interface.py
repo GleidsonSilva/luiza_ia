@@ -2,7 +2,9 @@ import math, threading, random, time, re
 import numpy as np
 import sounddevice as sd
 import assistente
+import memoria
 import debug
+import reconhecimento_voz
 
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
@@ -1037,6 +1039,13 @@ class LuizaApp(App[None]):
             if not texto:
                 self.call_from_thread(self._voltar_idle)
                 return
+
+            if texto and reconhecimento_voz.modelo_carregado():
+                child_id_voz = reconhecimento_voz.identificar_crianca(audio)
+                if child_id_voz and child_id_voz != assistente.child_id_ativo:
+                    assistente.child_id_ativo = child_id_voz
+                    assistente.mem = memoria.carregar(child_id_voz)
+                    debug.log(f"voice_id: crianca identificada por voz: {child_id_voz[:12]}...")
 
             self.call_from_thread(self._atualizar_stt, texto)
             self.call_from_thread(self._mudar_expressao, "pensando")

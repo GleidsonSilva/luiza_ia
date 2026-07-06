@@ -21,6 +21,7 @@ import contexto
 import gerenciador_contexto as ctx_mgr
 import historico
 import debug
+import reconhecimento_voz
 
 SR = 16000
 MAX_DURATION = 15
@@ -29,7 +30,11 @@ MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
 MAX_HISTORICO_TURNOS = 10
+MIN_RMS_ENROLLMENT = 0.01
 COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
+
+# Buffer de audio: limitado a ~60s para evitar consumo infinito de memoria
+BUF_MAX_CHUNKS = 960
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
@@ -111,6 +116,14 @@ REGRAS DE USO:
 - Nao faca perguntas de confirmacao desnecessarias se a informacao ja estiver clara
 - Se alguma ferramenta retornar erro ou resultado vazio, responda com naturalidade ('nao consegui descobrir', 'nao sei'). NUNCA exiba o erro tecnico para a crianca.
 - Voce decide quando lembrar e quando esquecer. Nao chame ferramentas de memoria a menos que faca sentido para a conversa
+
+### IDENTIFICACAO AUTOMATICA POR VOZ
+- O sistema pode identificar automaticamente qual crianca esta falando pela voz.
+- Quando o sistema detectar uma troca de crianca, a memoria da crianca anterior ja foi substituida pela da nova.
+- Se voce nao tiver certeza de quem esta falando, confirme de forma natural: " voce eh o [nome da memoria]?"
+- Se a crianca confirmar, continue a conversa normalmente.
+- Se a crianca negar ou corrigir, chame `lembrar_nome` com o nome correto.
+- Se a identificacao por voz estiver falhando muito, voce pode chamar `registrar_voz` para atualizar a assinatura.
 
 ### MEMORIA
 - Cada crianca tem sua propria memoria separada
@@ -327,6 +340,18 @@ tools = [
                     }
                 },
                 "required": ["ultimas_n_sessoes", "max_results"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "registrar_voz",
+            "description": "Registra ou atualiza a assinatura de voz da crianca ativa. Use quando: (1) a crianca pedir explicitamente ('quero registrar minha voz', 'salvar minha voz'), (2) a identificacao por voz falhou ou esta imprecisa, (3) voce suspeitar que a crianca errada esta associada a este nome. Gravamos 5s de audio atual para criar uma nova assinatura.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
             }
         }
     }
@@ -598,6 +623,30 @@ def perguntar(texto: str) -> str:
                 if mem_formatada:
                     result += f"\n\nMemoria carregada:\n{mem_formatada}"
                 debug.log(f"tool: lembrar_nome -> nome='{novo_nome}' id={child_id_ativo[:12]}...")
+
+                try:
+                    import assistente as _assistente_mod
+                    with _assistente_mod.buf_lock:
+                        fim = len(_assistente_mod.buf)
+                        inicio = max(0, fim - int(5 * SR))
+                        chunks = _assistente_mod.buf[inicio:fim]
+                    if chunks:
+                        audio_para_assinatura = np.concatenate(chunks)
+                        rms = float(np.sqrt(np.mean(audio_para_assinatura**2)))
+                        baixa_confianca = len(chunks) < int(3 * SR)
+                        if rms > MIN_RMS_ENROLLMENT:
+                            reconhecimento_voz.salvar_assinatura(
+                                child_id_ativo, novo_nome, audio_para_assinatura,
+                                baixa_confianca=baixa_confianca
+                            )
+                            if baixa_confianca:
+                                result += "\n\n(Assinatura de voz capturada, mas com pouca qualidade. Se a identificacao falhar, peça para registrar novamente.)"
+                        else:
+                            debug.log(f"voice_id: RMS muito baixo ({rms:.4f}), assinatura nao salva")
+                    else:
+                        debug.log("voice_id: sem audio no buffer para enrollment")
+                except Exception as e:
+                    debug.log(f"voice_id: erro no enrollment automatico: {e}")
             elif name == "carregar_memoria":
                 if child_id_ativo is None:
                     result = "Nenhuma crianca ativa. Use lembrar_nome primeiro para identificar quem esta falando."
@@ -672,6 +721,34 @@ def perguntar(texto: str) -> str:
                 except Exception as e:
                     result = f"[]"
                 debug.log(f"tool: buscar_historico -> {len(itens)} itens")
+            elif name == "registrar_voz":
+                if child_id_ativo is None:
+                    result = "Nenhuma crianca ativa. Use lembrar_nome primeiro para registrar uma voz."
+                else:
+                    try:
+                        import assistente as _assistente_mod
+                        with _assistente_mod.buf_lock:
+                            fim = len(_assistente_mod.buf)
+                            inicio = max(0, fim - int(5 * SR))
+                            chunks = _assistente_mod.buf[inicio:fim]
+                        if chunks:
+                            audio_novo = np.concatenate(chunks)
+                            rms = float(np.sqrt(np.mean(audio_novo**2)))
+                            if rms > MIN_RMS_ENROLLMENT:
+                                nome_salvo = mem.get("crianca", {}).get("nome", "")
+                                reconhecimento_voz.salvar_assinatura(
+                                    child_id_ativo, nome_salvo, audio_novo, baixa_confianca=False
+                                )
+                                reconhecimento_voz.marcar_assinatura_confirmada(child_id_ativo)
+                                result = f"Assinatura de voz atualizada para {nome_salvo}!"
+                            else:
+                                result = f"Audio muito silencioso (RMS={rms:.4f}). Fale mais alto e tente de novo."
+                        else:
+                            result = "Sem audio disponivel. Fale algo primeiro para registrar sua voz."
+                    except Exception as e:
+                        result = f"Erro ao registrar voz: {e}"
+                        debug.log(f"tool: registrar_voz erro: {e}")
+                debug.log(f"tool: registrar_voz -> child_id={child_id_ativo[:12] if child_id_ativo else 'none'}...")
             else:
                 result = "Nao conheco essa ferramenta."
                 debug.log(f"tool: desconhecida '{name}'")
@@ -686,6 +763,25 @@ def perguntar(texto: str) -> str:
             break
 
     debug.log(f"perguntar: resposta final ({len(resposta)} chars): '{resposta[:80]}{'...' if len(resposta) > 80 else ''}'")
+
+    if child_id_ativo and reconhecimento_voz.verificar_re_enrollment(child_id_ativo, mem.get("crianca", {}).get("nome", "")):
+        debug.log(f"voice_id: re-enrollment necessario para {child_id_ativo[:12]}...")
+        try:
+            import assistente as _assistente_mod
+            with _assistente_mod.buf_lock:
+                fim = len(_assistente_mod.buf)
+                inicio = max(0, fim - int(5 * SR))
+                chunks = _assistente_mod.buf[inicio:fim]
+            if chunks:
+                audio_novo = np.concatenate(chunks)
+                rms = float(np.sqrt(np.mean(audio_novo**2)))
+                if rms > MIN_RMS_ENROLLMENT:
+                    nome = mem.get("crianca", {}).get("nome", "")
+                    reconhecimento_voz.atualizar_assinatura(child_id_ativo, nome, audio_novo)
+                    reconhecimento_voz.marcar_assinatura_confirmada(child_id_ativo)
+                    debug.log(f"voice_id: re-enrollment concluido para {child_id_ativo[:12]}...")
+        except Exception as e:
+            debug.log(f"voice_id: erro no re-enrollment: {e}")
 
     memoria.salvar(mem, child_id_ativo)
 
@@ -805,12 +901,19 @@ nome_crianca = ""
 def _stream_callback(indata, frames, time, status):
     with buf_lock:
         buf.append(indata.copy())
+        # Poda chunks antigos se ultrapassar limite (protege memoria em idle longo)
+        if len(buf) > BUF_MAX_CHUNKS:
+            # Remove excesso de uma vez para minimizar lock contention
+            excesso = len(buf) - BUF_MAX_CHUNKS
+            del buf[:excesso]
+            debug.log(f"voice_id: buffer podado em {excesso} chunks (limit={BUF_MAX_CHUNKS})")
 
 
 def iniciar_stream():
     global stream, buf, nome_crianca
     nome_crianca = mem.get("crianca", {}).get("nome", "")
-    buf = []
+    with buf_lock:
+        buf = []
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
                             callback=_stream_callback)
     stream.start()

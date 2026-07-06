@@ -1,5 +1,6 @@
 .venv/
 venv/
+.kilo/
 debug/
 __pycache__/
 *.pyc
@@ -9,3 +10,13 @@ debug.log
 
 /historico/
 historico/session_ativa.json
+
+# memorias e assinaturas de voz (dados sensiveis / por-crianca)
+memorias/
+memorias/*.json
+
+# modelos locais grandes / offline
+models/
+models/ecapa_voxceleb.onnx
+models/fbank-80x201-f32.bin
+models/pretrained_ecapa/
