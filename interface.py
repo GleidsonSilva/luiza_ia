@@ -752,6 +752,7 @@ class LuizaApp(App[None]):
         self._bocejando = False
         self._trans_frame = -1
         self._trans_total = 0
+        self._PHRASES_START = ["oi", "estou ouvindo", "pode falar", "diz aí", "sim?", "pois não?", "olá", "opa"]
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -971,8 +972,16 @@ class LuizaApp(App[None]):
         self._boca_delay_timer = None
         self._boca_timer.resume()
 
+    def _falar_frase_inicio(self):
+        frase = random.choice(self._PHRASES_START)
+        try:
+            assistente.falar(frase)
+        except Exception as e:
+            debug.log(f"_falar_frase_inicio: erro TTS: {e}")
+
     def _iniciar_gravacao(self):
         self.gravando = True
+        self._falar_frase_inicio()
         self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
@@ -1036,7 +1045,7 @@ class LuizaApp(App[None]):
             rms = self._vad.rms
             if rms < 0.008:
                 self._silencio_count += 1
-                if self._silencio_count >= 5:
+                if self._silencio_count >= 10:
                     debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                     self._parar_gravacao()
             else:
