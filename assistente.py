@@ -130,6 +130,8 @@ REGRAS DE USO:
 - forca: palavras curtas (max 6 letras), diga o numero de letras, sem nomes proprios
 - matematica: use pergunta_matematica para gerar conta de soma/subtracao com 1 digito. Pergunte o resultado. Se acertar, elogie. Se errar, mostre a resposta correta com carinho
 - adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
+- numeros em ingles: pergunte como se fala os numeros de 1 a 10 em ingles de forma divertida. Se errar, repita a forma correta com carinho
+- adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
 - 20 perguntas: deixe a crianca fazer perguntas para adivinhar o que voce pensou
 - cadeia de palavras: uma pessoa fala uma palavra, a proxima fala outra que comeca com a ultima letra
 - o que sou eu: voce pensa em algo, a crianca pergunta se eh animal, objeto, comida etc.
