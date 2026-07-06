@@ -692,8 +692,27 @@ class LuizaApp(App[None]):
     ]
 
     _ultimo_toggle: float = 0.0
+    _wake_enabled: bool = True
+
+    def _wake_check(self, trigger=False):
+        if trigger:
+            agora = time.monotonic()
+            if self.processando or self.gravando:
+                return
+            if agora - self._ultimo_toggle < 1.0:
+                return
+            self.call_from_thread(self.action_toggle_recording)
+        elif self._wake_enabled:
+            return not self.gravando and not self.processando and self.expressao == "idle"
+        return True
 
     def action_quit(self):
+        if self._wake_enabled:
+            try:
+                import detector_palavra
+                detector_palavra.stop()
+            except Exception:
+                pass
         assistente.parar_stream()
         self.exit()
 
@@ -743,11 +762,14 @@ class LuizaApp(App[None]):
         with Horizontal(classes="bubble-row"):
             yield Static("[#7a1f18]Luiza:[/]", id="tts-text", classes="bubble bubble-luiza")
         yield Static("", id="ctx-usage")
-        yield Static("\[Espaço/Enter] Falar  \[Esc] Sair", id="hint")
+        yield Static("\[Espaço/Enter] Falar  \[Diga 'Luiza'] Ativar  \[Esc] Sair", id="hint")
 
     def on_mount(self):
         assistente._identidade_confirmada = False
         assistente.iniciar_stream()
+        if self._wake_enabled:
+            import detector_palavra
+            detector_palavra.start(callback=self._wake_check)
         self._boca_timer = self.set_interval(1 / 18, self._avancar_boca,
                                              pause=True)
         self._silencio_timer = self.set_interval(0.5, self._verificar_silencio,
@@ -954,6 +976,7 @@ class LuizaApp(App[None]):
         self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
+            debug.log(f"_iniciar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx}")
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
@@ -968,20 +991,29 @@ class LuizaApp(App[None]):
         self.processando = True
         self._mudar_expressao("transcrevendo")
         with assistente.buf_lock:
-            chunks = assistente.buf[self.recording_idx:]
+            effective_idx = min(self.recording_idx, len(assistente.buf))
+            chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
+            debug.log(f"_parar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx} "
+                       f"effective_idx={effective_idx} chunks={len(chunks)}")
         if not chunks:
-            time.sleep(0.5)
-            with assistente.buf_lock:
-                chunks = assistente.buf[self.recording_idx:]
+            # Tenta esperar um pouco o buffer encher
+            for _ in range(5):
+                time.sleep(0.2)
+                with assistente.buf_lock:
+                    effective_idx = min(self.recording_idx, len(assistente.buf))
+                    chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
+                    debug.log(f"_parar_gravacao: retry buf_len={len(assistente.buf)} chunks={len(chunks)}")
+                if chunks:
+                    break
         if not chunks:
-            debug.log("_parar_gravacao: buf vazio, abortando")
+            debug.log("_parar_gravacao: sem audio novo, voltando ao repouso")
             self.processando = False
             self.recording_idx = 0
             self._mudar_expressao("idle")
             return
         audio = np.concatenate(chunks)
         with assistente.buf_lock:
-            del assistente.buf[:self.recording_idx]
+            del assistente.buf[:effective_idx]
             self.recording_idx = 0
         threading.Thread(target=self._processar, args=(audio,),
                          daemon=True).start()
@@ -991,7 +1023,7 @@ class LuizaApp(App[None]):
             return
         try:
             agora = time.monotonic()
-            if agora - self._inicio_gravacao < 1.5:
+            if agora - self._inicio_gravacao < 0.5:
                 return
             with assistente.buf_lock:
                 recent = assistente.buf[self.recording_idx:]
@@ -1004,7 +1036,7 @@ class LuizaApp(App[None]):
             rms = self._vad.rms
             if rms < 0.008:
                 self._silencio_count += 1
-                if self._silencio_count >= 10:
+                if self._silencio_count >= 5:
                     debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                     self._parar_gravacao()
             else:

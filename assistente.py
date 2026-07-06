@@ -379,8 +379,11 @@ def transcrever(audio: np.ndarray) -> str:
     audio = trim_silence(audio)
     rms = np.sqrt(np.mean(audio**2)) if len(audio) > 0 else 0
     debug.log(f"transcrever: after trim len={len(audio)} rms={rms:.5f}")
-    if len(audio) < SR * 0.3:
-        debug.log(f"too short ({len(audio)} < {SR * 0.3})")
+    if len(audio) < SR * 0.5:
+        debug.log(f"too short ({len(audio)} < {SR * 0.5})")
+        return ""
+    if rms < 0.010:
+        debug.log(f"rms muito baixo ({rms:.5f} < 0.010)")
         return ""
     peak = np.max(np.abs(audio))
     if peak > 0:
@@ -896,22 +899,32 @@ buf_lock = threading.Lock()
 buf = []
 stream = None
 nome_crianca = ""
+_accum = np.array([], dtype=np.float32)
+
+# Acumula chunks pequenos (ex: 15 samples) em blocos de 1024 amostras
+# para evitar que o buffer encha e pode demais
+_ACCUM_TARGET = 1024
 
 
 def _stream_callback(indata, frames, time, status):
+    global _accum
+    _accum = np.concatenate([_accum, indata.ravel()])
+    if len(_accum) < _ACCUM_TARGET:
+        return
+    chunk = _accum[:_ACCUM_TARGET].copy()
+    _accum = _accum[_ACCUM_TARGET:]
     with buf_lock:
-        buf.append(indata.copy())
-        # Poda chunks antigos se ultrapassar limite (protege memoria em idle longo)
+        buf.append(chunk)
         if len(buf) > BUF_MAX_CHUNKS:
-            # Remove excesso de uma vez para minimizar lock contention
             excesso = len(buf) - BUF_MAX_CHUNKS
             del buf[:excesso]
 
 
 def iniciar_stream():
-    global stream, buf, nome_crianca
+    global stream, buf, nome_crianca, _accum
     nome_crianca = mem.get("crianca", {}).get("nome", "")
     with buf_lock:
+        _accum = np.array([], dtype=np.float32)
         buf = []
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
                             callback=_stream_callback)
