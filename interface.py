@@ -1043,9 +1043,9 @@ class LuizaApp(App[None]):
             if self._vad.count < 4000:
                 return
             rms = self._vad.rms
-            if rms < 0.008:
+            if rms < 0.015:
                 self._silencio_count += 1
-                if self._silencio_count >= 10:
+                if self._silencio_count >= 3:
                     debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                     self._parar_gravacao()
             else:
