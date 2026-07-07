@@ -753,6 +753,9 @@ class LuizaApp(App[None]):
         self._trans_frame = -1
         self._trans_total = 0
         self._PHRASES_START = ["oi", "estou ouvindo", "pode falar", "diz aí", "sim?", "pois não?", "olá", "opa"]
+        self._PHRASES_WAKE = ["oi", "sim?", "pois não?", "olá", "opa"]
+        self._PHRASES_LISTEN = ["estou ouvindo", "pode falar", "diz aí"]
+        self._auto_listen_event = threading.Event()
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -972,16 +975,24 @@ class LuizaApp(App[None]):
         self._boca_delay_timer = None
         self._boca_timer.resume()
 
-    def _falar_frase_inicio(self):
-        frase = random.choice(self._PHRASES_START)
+    def _falar_frase_inicio(self, from_wake=None):
+        if from_wake is None:
+            from_wake = not self._auto_listen_event.is_set()
+        if from_wake:
+            frase = random.choice(self._PHRASES_WAKE)
+        else:
+            frase = random.choice(self._PHRASES_LISTEN)
         try:
             assistente.falar(frase)
         except Exception as e:
             debug.log(f"_falar_frase_inicio: erro TTS: {e}")
 
     def _iniciar_gravacao(self):
+        from_auto = self._auto_listen_event.is_set()
+        if from_auto:
+            self._auto_listen_event.clear()
         self.gravando = True
-        self._falar_frase_inicio()
+        self._falar_frase_inicio(from_wake=not from_auto)
         self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
@@ -1114,6 +1125,7 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts_erro, f"Erro: {e}")
         finally:
             debug.log("_processar finalizando")
+            self._auto_listen_event.set()
             self.call_from_thread(self._voltar_idle)
             self.processando = False
 
@@ -1169,4 +1181,8 @@ class LuizaApp(App[None]):
             pass
 
     def _voltar_idle(self):
+        if self._auto_listen_event.is_set():
+            self._auto_listen_event.clear()
+            self._iniciar_gravacao()
+            return
         self._mudar_expressao("idle")
