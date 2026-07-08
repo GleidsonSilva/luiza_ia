@@ -756,6 +756,7 @@ class LuizaApp(App[None]):
         self._PHRASES_WAKE = ["oi", "sim?", "pois não?", "olá", "opa"]
         self._PHRASES_LISTEN = ["estou ouvindo", "pode falar", "diz aí"]
         self._auto_listen_event = threading.Event()
+        self._auto_listen_enabled = False
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -989,8 +990,9 @@ class LuizaApp(App[None]):
 
     def _iniciar_gravacao(self):
         from_auto = self._auto_listen_event.is_set()
+        self._auto_listen_event.clear()
         if from_auto:
-            self._auto_listen_event.clear()
+            self._auto_listen_enabled = False
         self.gravando = True
         self._falar_frase_inicio(from_wake=not from_auto)
         self._vad.clear()
@@ -1085,6 +1087,7 @@ class LuizaApp(App[None]):
 
     def _processar_impl(self, audio):
         t0_total = time.time()
+        self._auto_listen_enabled = False
         try:
             debug.log(f"_processar: audio shape={audio.shape}")
             texto = assistente.transcrever(audio)
@@ -1115,6 +1118,7 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts, resposta)
 
             assistente.falar(resposta)
+            self._auto_listen_enabled = True
             debug.log(f"_processar: fim={time.time()-t0_total:.2f}s")
         except Exception as e:
             import traceback
@@ -1125,7 +1129,8 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts_erro, f"Erro: {e}")
         finally:
             debug.log("_processar finalizando")
-            self._auto_listen_event.set()
+            if self._auto_listen_enabled:
+                self._auto_listen_event.set()
             self.call_from_thread(self._voltar_idle)
             self.processando = False
 
