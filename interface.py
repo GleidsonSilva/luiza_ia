@@ -926,7 +926,11 @@ class LuizaApp(App[None]):
         self._trans_timer.resume()
         self._atualizar_rosto()
         status = self.query_one("#status", Static)
-        status.update(STATUS_MAP.get(expressao, ""))
+        if expressao == "idle" and assistente.obter_nome_crianca():
+            nome = assistente.obter_nome_crianca()
+            status.update(f"[#7a1f18]{nome}[/] | {STATUS_MAP.get(expressao, '')}")
+        else:
+            status.update(STATUS_MAP.get(expressao, ""))
         if expressao == "idle":
             try:
                 self.query_one("#tts-text", Static).remove_class("bubble-erro")
@@ -1161,7 +1165,7 @@ class LuizaApp(App[None]):
 
             debug.log("chamando perguntar...")
             t1 = time.time()
-            resposta = assistente.perguntar(texto)
+            resposta = assistente.perguntar(texto, audio=audio)
             debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
@@ -1245,3 +1249,7 @@ class LuizaApp(App[None]):
             self._iniciar_gravacao_com_saudacao(from_wake=False)
             return
         self._mudar_expressao("idle")
+        nome = assistente.obter_nome_crianca()
+        if nome:
+            status = self.query_one("#status", Static)
+            status.update(f"[#7a1f18]{nome}[/] | {STATUS_MAP.get('idle', '')}")

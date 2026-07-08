@@ -88,6 +88,37 @@ def adicionar_fato(mem: dict, chave: str, valor: str, categoria: str = "crianca"
     return mem, valor_final
 
 
+def remover_fato(mem: dict, chave: Optional[str] = None, categoria: Optional[str] = None) -> dict:
+    """Remove um fato da memoria.
+    
+    Args:
+        chave: Nome do campo em 'crianca' (ex: idade, cor_favorita).
+               Se None e categoria='crianca', limpa todos os dados pessoais.
+        categoria: 'crianca', 'topico', 'jogo' ou 'tema'.
+                   Se None, busca em todas as categorias pelo valor.
+    """
+    if categoria and categoria != "crianca":
+        lista_key = {"topico": "topicos", "jogo": "historico_jogos", "tema": "ultimos_temas"}.get(categoria)
+        if lista_key and lista_key in mem:
+            if chave:
+                # Remove itens que contem o texto (case-insensitive)
+                mem[lista_key] = [x for x in mem[lista_key] if chave.lower() not in x.lower()]
+            else:
+                mem[lista_key] = []
+    elif categoria == "crianca":
+        if chave:
+            mem.setdefault("crianca", {}).pop(chave, None)
+        else:
+            mem["crianca"] = {}
+    else:
+        # Sem categoria definida: tenta remover de todas
+        mem.setdefault("crianca", {}).pop(chave, None)
+        for lista_key in ("topicos", "historico_jogos", "ultimos_temas"):
+            if chave and lista_key in mem:
+                mem[lista_key] = [x for x in mem[lista_key] if chave.lower() not in x.lower()]
+    return mem
+
+
 def carregar_tudo(child_id: Optional[str] = None) -> str:
     mem = carregar(child_id)
     return json.dumps(mem, ensure_ascii=False, indent=2)

@@ -35,6 +35,7 @@ COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 
 # Buffer de audio: limitado a ~60s para evitar consumo infinito de memoria
 BUF_MAX_CHUNKS = 2880  # ~180s de audio; reduz poda agressiva e log spam
+ULTIMO_CHILD_PATH = os.path.join("memorias", "ultimo_child.json")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
@@ -109,6 +110,7 @@ OUTRAS FERRAMENTAS:
 6. calculadora: quando ela pedir uma conta especifica
 7. pergunta_matematica: EXCLUSIVO para brincadeira de matematica
 8. buscar_historico: quando voce quiser lembrar de conversas antigas com a crianca. Parametros: query (palavra-chave), child_id (hex da crianca, opcional), ultimas_n_sessoes (quantas sessoes recentes ver, default 5), max_results (default 50). Retorna mensagens do historico local. Use para lembrar de detalhes, temas ou brincadeiras antigas.
+9. esquecer_memoria: EXCLUSIVO quando a crianca PEDIR para esquecer algo ('esquece isso', 'apaga'). Nao use por conta propria. Parametros: chave (o que apagar, ex: idade, cor_favorita) e categoria (onde buscar).
 
 REGRAS DE USO:
 - Leia o resultado da ferramenta e responda como a Luiza naturalmente, incorporando a informacao como se ja soubesse. NUNCA mencione que fez uma busca ou consulta.
@@ -354,17 +356,76 @@ tools = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "esquecer_memoria",
+            "description": "Apaga uma informacao especifica da memoria da crianca ativa. Use quando a crianca pedir explicitamente para esquecer algo que falou ('esquece isso', 'apaga', 'nao quero que lembre'). Nao use para assuntos momentaneos - apenas quando ela pedir para esquecer. Parametros: chave (ex: idade, cor_favorita, nome - opcional, se omitido limpa a categoria inteira), categoria ('crianca', 'topico', 'jogo', 'tema' - opcional, se omitido busca em todas).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chave": {
+                        "type": "string",
+                        "description": "O que apagar: nome do campo em 'crianca' (ex: idade, cor_favorita, nome). Opcional - se omitido, limpa toda a categoria."
+                    },
+                    "categoria": {
+                        "type": "string",
+                        "description": "De onde apagar: 'crianca' (fatos pessoais), 'topico' (assuntos), 'jogo' (brincadeiras), 'tema' (conversas recentes). Opcional - se omitido, busca em todas.",
+                        "enum": ["crianca", "topico", "jogo", "tema"]
+                    }
+                },
+                "required": []
+            }
+        }
     }
 ]
 
 mem = memoria.carregar()
-child_id_ativo: Optional[str] = None
+_ultimo_child_id, _ultimo_nome = _carregar_ultimo_child()
+if _ultimo_child_id:
+    child_id_ativo: Optional[str] = _ultimo_child_id
+    mem = memoria.carregar(_ultimo_child_id)
+    debug.log(f"assistente: child_id recuperado do cache: {_ultimo_child_id[:12]}... ({_ultimo_nome})")
+else:
+    child_id_ativo: Optional[str] = None
 _identidade_confirmada = False
 session_id, historico = historico.carregar_ativa()
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
 tool_status_callback: Optional[callable] = None
+
+
+def _carregar_ultimo_child() -> tuple[Optional[str], Optional[str]]:
+    """Carrega o ultimo child_id e nome salvos do disco."""
+    try:
+        if os.path.exists(ULTIMO_CHILD_PATH):
+            with open(ULTIMO_CHILD_PATH, "r") as f:
+                data = json.load(f)
+            return data.get("child_id"), data.get("nome")
+    except Exception as e:
+        debug.log(f"_carregar_ultimo_child: erro: {e}")
+    return None, None
+
+
+def _salvar_ultimo_child(child_id: Optional[str], nome: str = "") -> None:
+    """Salva o child_id e nome ativos no disco para recuperacao futura."""
+    try:
+        os.makedirs(os.path.dirname(ULTIMO_CHILD_PATH), exist_ok=True)
+        with open(ULTIMO_CHILD_PATH, "w") as f:
+            json.dump({
+                "child_id": child_id,
+                "nome": nome,
+                "atualizado_em": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        debug.log(f"_salvar_ultimo_child: erro: {e}")
+
+
+def obter_nome_crianca() -> str:
+    """Retorna o nome da crianca ativa, ou string vazia."""
+    return mem.get("crianca", {}).get("nome", "")
 
 
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
@@ -512,7 +573,7 @@ def _executar_pergunta_matematica(args: dict) -> str:
         return f"Erro ao gerar pergunta: {e}"
 
 
-def perguntar(texto: str) -> str:
+def perguntar(texto: str, audio: Optional[np.ndarray] = None) -> str:
     global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
@@ -628,15 +689,20 @@ def perguntar(texto: str) -> str:
                 debug.log(f"tool: lembrar_nome -> nome='{novo_nome}' id={child_id_ativo[:12]}...")
 
                 try:
-                    import assistente as _assistente_mod
-                    with _assistente_mod.buf_lock:
-                        fim = len(_assistente_mod.buf)
-                        inicio = max(0, fim - int(5 * SR))
-                        chunks = _assistente_mod.buf[inicio:fim]
-                    if chunks:
-                        audio_para_assinatura = np.concatenate(chunks)
+                    audio_para_assinatura = None
+                    if audio is not None and len(audio) > 0.5 * SR:
+                        audio_para_assinatura = audio
+                    else:
+                        import assistente as _assistente_mod
+                        with _assistente_mod.buf_lock:
+                            fim = len(_assistente_mod.buf)
+                            inicio = max(0, fim - int(5 * SR))
+                            chunks = _assistente_mod.buf[inicio:fim]
+                        if chunks:
+                            audio_para_assinatura = np.concatenate(chunks)
+                    if audio_para_assinatura is not None:
                         rms = float(np.sqrt(np.mean(audio_para_assinatura**2)))
-                        baixa_confianca = len(chunks) < int(3 * SR)
+                        baixa_confianca = len(audio_para_assinatura) < int(3 * SR)
                         if rms > MIN_RMS_ENROLLMENT:
                             reconhecimento_voz.salvar_assinatura(
                                 child_id_ativo, novo_nome, audio_para_assinatura,
@@ -647,7 +713,7 @@ def perguntar(texto: str) -> str:
                         else:
                             debug.log(f"voice_id: RMS muito baixo ({rms:.4f}), assinatura nao salva")
                     else:
-                        debug.log("voice_id: sem audio no buffer para enrollment")
+                        debug.log("voice_id: sem audio disponivel para enrollment")
                 except Exception as e:
                     debug.log(f"voice_id: erro no enrollment automatico: {e}")
             elif name == "carregar_memoria":
@@ -770,13 +836,18 @@ def perguntar(texto: str) -> str:
     if child_id_ativo and reconhecimento_voz.verificar_re_enrollment(child_id_ativo, mem.get("crianca", {}).get("nome", "")):
         debug.log(f"voice_id: re-enrollment necessario para {child_id_ativo[:12]}...")
         try:
-            import assistente as _assistente_mod
-            with _assistente_mod.buf_lock:
-                fim = len(_assistente_mod.buf)
-                inicio = max(0, fim - int(5 * SR))
-                chunks = _assistente_mod.buf[inicio:fim]
-            if chunks:
-                audio_novo = np.concatenate(chunks)
+            audio_novo = None
+            if audio is not None and len(audio) > 0.5 * SR:
+                audio_novo = audio
+            else:
+                import assistente as _assistente_mod
+                with _assistente_mod.buf_lock:
+                    fim = len(_assistente_mod.buf)
+                    inicio = max(0, fim - int(5 * SR))
+                    chunks = _assistente_mod.buf[inicio:fim]
+                if chunks:
+                    audio_novo = np.concatenate(chunks)
+            if audio_novo is not None:
                 rms = float(np.sqrt(np.mean(audio_novo**2)))
                 if rms > MIN_RMS_ENROLLMENT:
                     nome = mem.get("crianca", {}).get("nome", "")
@@ -787,6 +858,8 @@ def perguntar(texto: str) -> str:
             debug.log(f"voice_id: erro no re-enrollment: {e}")
 
     memoria.salvar(mem, child_id_ativo)
+    if child_id_ativo:
+        _salvar_ultimo_child(child_id_ativo, mem.get("crianca", {}).get("nome", ""))
 
     historico.append({"role": "user", "content": texto})
     historico.append({"role": "assistant", "content": resposta})

@@ -36,6 +36,7 @@ ASSINATURAS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mem
 THRESHOLD = 0.70
 MIN_RMS_ENROLLMENT = 0.01
 MAX_BUFFER_SEGUNDOS = 5
+MAX_EMBEDDINGS_POR_USUARIO = 5  # pool de embeddings por crianca
 
 N_FFT = 400
 HOP_LENGTH = 160
@@ -162,7 +163,16 @@ def _carregar_assinaturas() -> dict:
             try:
                 with open(ASSINATURAS_PATH, "r") as f:
                     dados = json.load(f)
-                _assinaturas = dados.get("assinaturas", {})
+                raw = dados.get("assinaturas", {})
+                # Migrar formato antigo (embedding unico) para pool de embeddings
+                _assinaturas = {}
+                for cid, val in raw.items():
+                    entry = dict(val)
+                    if "embedding" in entry and "embeddings" not in entry:
+                        entry["embeddings"] = [entry.pop("embedding")]
+                    elif "embeddings" not in entry:
+                        entry["embeddings"] = []
+                    _assinaturas[cid] = entry
             except Exception as e:
                 debug_log(f"reconhecimento_voz: erro ao carregar assinaturas: {e}")
                 _assinaturas = {}
@@ -181,6 +191,28 @@ def _salvar_assinaturas() -> None:
         debug_log(f"reconhecimento_voz: erro ao salvar assinaturas: {e}")
 
 
+def _melhor_score_contra_pool(emb_atual: np.ndarray, assinaturas: dict) -> tuple[Optional[str], float]:
+    """Compara embedding contra pool de embeddings de cada crianca.
+    Retorna (child_id, score) do melhor match acima do threshold."""
+    melhor_child_id = None
+    melhor_score = THRESHOLD
+    for child_id, dados in assinaturas.items():
+        pool = dados.get("embeddings", [])
+        if not pool:
+            continue
+        for emb_raw in pool:
+            emb_salvo = np.array(emb_raw, dtype=np.float32)
+            if len(emb_salvo) == 0:
+                continue
+            score = cosine_similarity(emb_atual, emb_salvo)
+            if score > melhor_score:
+                melhor_score = score
+                melhor_child_id = child_id
+    if melhor_child_id:
+        debug_log(f"reconhecimento_voz: MATCH child_id={melhor_child_id[:12]}... score={melhor_score:.3f}")
+    return melhor_child_id, melhor_score
+
+
 def identificar_crianca(audio: np.ndarray) -> Optional[str]:
     if _modelo is None or _fbank_matrix is None:
         return None
@@ -193,19 +225,8 @@ def identificar_crianca(audio: np.ndarray) -> Optional[str]:
         assinaturas = _carregar_assinaturas()
         if not assinaturas:
             return None
-        melhor_child_id = None
-        melhor_score = THRESHOLD
-        for child_id, dados in assinaturas.items():
-            emb_salvo = np.array(dados.get("embedding", []), dtype=np.float32)
-            if len(emb_salvo) == 0:
-                continue
-            score = cosine_similarity(emb_atual, emb_salvo)
-            debug_log(f"reconhecimento_voz: child_id={child_id[:12]}... score={score:.3f}")
-            if score > melhor_score:
-                melhor_score = score
-                melhor_child_id = child_id
+        melhor_child_id, _ = _melhor_score_contra_pool(emb_atual, assinaturas)
         if melhor_child_id:
-            debug_log(f"reconhecimento_voz: MATCH child_id={melhor_child_id[:12]}... score={melhor_score:.3f}")
             _registrar_interacao(melhor_child_id)
         return melhor_child_id
     except Exception as e:
@@ -224,16 +245,23 @@ def salvar_assinatura(child_id: str, nome: str, audio: np.ndarray, baixa_confian
         if emb is None:
             return False
         assinaturas = _carregar_assinaturas()
+        dados_existente = assinaturas.get(child_id, {})
+        pool = dados_existente.get("embeddings", [])
+        # Adiciona novo embedding ao pool, mantendo no maximo MAX_EMBEDDINGS_POR_USUARIO
+        pool.append(emb.tolist())
+        if len(pool) > MAX_EMBEDDINGS_POR_USUARIO:
+            pool = pool[-MAX_EMBEDDINGS_POR_USUARIO:]  # mantem os mais recentes
         assinaturas[child_id] = {
-            "embedding": emb.tolist(),
+            "embeddings": pool,
             "nome": nome,
-            "criado_em": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "amostras_usadas": assinaturas.get(child_id, {}).get("amostras_usadas", 0) + 1,
+            "criado_em": dados_existente.get("criado_em", time.strftime("%Y-%m-%dT%H:%M:%S")),
+            "atualizado_em": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "amostras_usadas": dados_existente.get("amostras_usadas", 0) + 1,
             "baixa_confianca": baixa_confianca,
         }
         _assinaturas = assinaturas
         _salvar_assinaturas()
-        debug_log(f"reconhecimento_voz: assinatura salva para {child_id[:12]}... ({nome}) baixa_confianca={baixa_confianca}")
+        debug_log(f"reconhecimento_voz: assinatura salva para {child_id[:12]}... ({nome}) pool_size={len(pool)} baixa_confianca={baixa_confianca}")
         return True
     except Exception as e:
         debug_log(f"reconhecimento_voz: erro ao salvar assinatura: {e}")
@@ -255,6 +283,15 @@ def marcar_assinatura_confirmada(child_id: str) -> None:
         assinaturas[child_id]["baixa_confianca"] = False
         _assinaturas = assinaturas
         _salvar_assinaturas()
+
+
+
+def obter_qtd_embeddings(child_id: str) -> int:
+    """Retorna quantas amostras de voz existem no pool desta crianca."""
+    assin = obter_assinatura(child_id)
+    if not assin:
+        return 0
+    return len(assin.get("embeddings", []))
 
 
 def _registrar_interacao(child_id: str) -> None:
