@@ -757,6 +757,7 @@ class LuizaApp(App[None]):
         self._PHRASES_LISTEN = ["estou ouvindo", "pode falar", "diz aí"]
         self._auto_listen_event = threading.Event()
         self._auto_listen_enabled = False
+        self._min_listen_time = 5.0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -995,10 +996,12 @@ class LuizaApp(App[None]):
             except Exception as e:
                 debug.log(f"_iniciar_gravacao_com_saudacao: erro TTS: {e}")
             finally:
-                self.call_from_thread(self._iniciar_gravacao)
+                min_dur = 5.0 if from_wake else 15.0
+                self.call_from_thread(self._iniciar_gravacao, min_dur)
         threading.Thread(target=_falar, daemon=True).start()
 
-    def _iniciar_gravacao(self):
+    def _iniciar_gravacao(self, min_duration=5.0):
+        self._min_listen_time = min_duration
         self.gravando = True
         self._vad.clear()
         with assistente.buf_lock:
@@ -1063,7 +1066,7 @@ class LuizaApp(App[None]):
             rms = self._vad.rms
             if rms < 0.015:
                 self._silencio_count += 1
-                if (agora - self._inicio_gravacao >= 5.0 and
+                if (agora - self._inicio_gravacao >= self._min_listen_time and
                         self._silencio_count >= 4):
                     debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                     self._parar_gravacao()
