@@ -381,21 +381,6 @@ tools = [
     }
 ]
 
-mem = memoria.carregar()
-_ultimo_child_id, _ultimo_nome = _carregar_ultimo_child()
-if _ultimo_child_id:
-    child_id_ativo: Optional[str] = _ultimo_child_id
-    mem = memoria.carregar(_ultimo_child_id)
-    debug.log(f"assistente: child_id recuperado do cache: {_ultimo_child_id[:12]}... ({_ultimo_nome})")
-else:
-    child_id_ativo: Optional[str] = None
-_identidade_confirmada = False
-session_id, historico = historico.carregar_ativa()
-resumo_sessao = ""
-turnos_desde_compactacao = 0
-ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
-tool_status_callback: Optional[callable] = None
-
 
 def _carregar_ultimo_child() -> tuple[Optional[str], Optional[str]]:
     """Carrega o ultimo child_id e nome salvos do disco."""
@@ -428,6 +413,22 @@ def obter_nome_crianca() -> str:
     return mem.get("crianca", {}).get("nome", "")
 
 
+
+
+mem = memoria.carregar()
+_ultimo_child_id, _ultimo_nome = _carregar_ultimo_child()
+if _ultimo_child_id:
+    child_id_ativo: Optional[str] = _ultimo_child_id
+    mem = memoria.carregar(_ultimo_child_id)
+    debug.log(f"assistente: child_id recuperado do cache: {_ultimo_child_id[:12]}... ({_ultimo_nome})")
+else:
+    child_id_ativo: Optional[str] = None
+_identidade_confirmada = False
+session_id, historico = historico.carregar_ativa()
+resumo_sessao = ""
+turnos_desde_compactacao = 0
+ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
+tool_status_callback: Optional[callable] = None
 def trim_silence(audio: np.ndarray, threshold=0.005) -> np.ndarray:
     mask = np.abs(audio) > threshold
     idxs = np.where(mask)[0]
