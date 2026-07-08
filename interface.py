@@ -725,7 +725,7 @@ class LuizaApp(App[None]):
                 return
             self._ultimo_toggle = agora
             self._inicio_gravacao = agora
-            self._iniciar_gravacao()
+            self._iniciar_gravacao_com_saudacao(from_wake=True)
         elif agora - self._inicio_gravacao >= 3.5:
             self._parar_gravacao()
 
@@ -988,13 +988,18 @@ class LuizaApp(App[None]):
         except Exception as e:
             debug.log(f"_falar_frase_inicio: erro TTS: {e}")
 
+    def _iniciar_gravacao_com_saudacao(self, from_wake):
+        def _falar():
+            try:
+                self._falar_frase_inicio(from_wake=from_wake)
+            except Exception as e:
+                debug.log(f"_iniciar_gravacao_com_saudacao: erro TTS: {e}")
+            finally:
+                self.call_from_thread(self._iniciar_gravacao)
+        threading.Thread(target=_falar, daemon=True).start()
+
     def _iniciar_gravacao(self):
-        from_auto = self._auto_listen_event.is_set()
-        self._auto_listen_event.clear()
-        if from_auto:
-            self._auto_listen_enabled = False
         self.gravando = True
-        self._falar_frase_inicio(from_wake=not from_auto)
         self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
@@ -1188,6 +1193,7 @@ class LuizaApp(App[None]):
     def _voltar_idle(self):
         if self._auto_listen_event.is_set():
             self._auto_listen_event.clear()
-            self._iniciar_gravacao()
+            self._auto_listen_enabled = False
+            self._iniciar_gravacao_com_saudacao(from_wake=False)
             return
         self._mudar_expressao("idle")
