@@ -1002,6 +1002,7 @@ class LuizaApp(App[None]):
 
     def _iniciar_gravacao(self, min_duration=5.0):
         self._min_listen_time = min_duration
+        self._inicio_gravacao = time.monotonic()
         self.gravando = True
         self._vad.clear()
         with assistente.buf_lock:
