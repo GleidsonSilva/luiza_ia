@@ -1051,6 +1051,22 @@ class LuizaApp(App[None]):
         threading.Thread(target=self._processar, args=(audio,),
                          daemon=True).start()
 
+    def _finalizar_escuta_sem_voz(self):
+        self._silencio_timer.pause()
+        self.gravando = False
+        self.processando = False
+        self.recording_idx = 0
+        frase = "Quando quiser conversar é só me chamar"
+        def _falar():
+            try:
+                assistente.falar(frase)
+            except Exception as e:
+                debug.log(f"_finalizar_escuta_sem_voz: erro TTS: {e}")
+            finally:
+                self.call_from_thread(self._atualizar_tts, frase)
+                self.call_from_thread(self._mudar_expressao, "idle")
+        threading.Thread(target=_falar, daemon=True).start()
+
     def _verificar_silencio(self):
         if not self.gravando:
             return
@@ -1072,11 +1088,13 @@ class LuizaApp(App[None]):
                 self._silencio_count = 0
             else:
                 self._silencio_count += 1
-                if (self._silencio_count >= 4 and
-                        (self._voice_detected or
-                         agora - self._inicio_gravacao >= self._min_listen_time)):
-                    debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
-                    self._parar_gravacao()
+                if self._silencio_count >= 4:
+                    if self._voice_detected:
+                        debug.log(f"voice ended, silence 2s, rms={rms:.5f}")
+                        self._parar_gravacao()
+                    elif agora - self._inicio_gravacao >= self._min_listen_time:
+                        debug.log(f"timeout, no voice, rms={rms:.5f}")
+                        self._finalizar_escuta_sem_voz()
             self._audio_rms = rms
         except Exception as e:
             import traceback
