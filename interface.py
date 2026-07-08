@@ -790,6 +790,7 @@ class LuizaApp(App[None]):
         self._agendar_olhar()
         self._agendar_bocejo()
         self._atualizar_rosto()
+        self._saudacao_inicial()
 
     def _agendar_piscar(self):
         self.set_timer(random.uniform(8, 15), self._piscar)
@@ -1065,6 +1066,26 @@ class LuizaApp(App[None]):
             finally:
                 self.call_from_thread(self._atualizar_tts, frase)
                 self.call_from_thread(self._mudar_expressao, "idle")
+        threading.Thread(target=_falar, daemon=True).start()
+
+    def _saudacao_inicial(self):
+        hora = time.localtime().tm_hour
+        if hora < 12:
+            saudacao = "Bom dia"
+        elif hora < 18:
+            saudacao = "Boa tarde"
+        else:
+            saudacao = "Boa noite"
+        frase = f"{saudacao}! Como vai?"
+        def _falar():
+            try:
+                assistente.falar(frase)
+            except Exception as e:
+                debug.log(f"_saudacao_inicial: erro TTS: {e}")
+                self.call_from_thread(self._mudar_expressao, "idle")
+                return
+            self.call_from_thread(self._atualizar_tts, frase)
+            self.call_from_thread(self._iniciar_gravacao, 15.0)
         threading.Thread(target=_falar, daemon=True).start()
 
     def _verificar_silencio(self):
