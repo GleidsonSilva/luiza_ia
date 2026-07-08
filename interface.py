@@ -1127,7 +1127,8 @@ class LuizaApp(App[None]):
     def _processar(self, audio):
         t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
         t.start()
-        if not t.join(timeout=180.0):
+        t.join(timeout=180.0)
+        if t.is_alive():
             sd.stop()
             debug.log("_processar: timeout")
             try:
