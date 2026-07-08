@@ -758,6 +758,7 @@ class LuizaApp(App[None]):
         self._auto_listen_event = threading.Event()
         self._auto_listen_enabled = False
         self._min_listen_time = 5.0
+        self._voice_detected = False
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -1004,6 +1005,7 @@ class LuizaApp(App[None]):
         self._min_listen_time = min_duration
         self._inicio_gravacao = time.monotonic()
         self.gravando = True
+        self._voice_detected = False
         self._vad.clear()
         with assistente.buf_lock:
             self.recording_idx = len(assistente.buf)
@@ -1065,14 +1067,16 @@ class LuizaApp(App[None]):
             if self._vad.count < 4000:
                 return
             rms = self._vad.rms
-            if rms < 0.015:
+            if rms >= 0.015:
+                self._voice_detected = True
+                self._silencio_count = 0
+            else:
                 self._silencio_count += 1
-                if (agora - self._inicio_gravacao >= self._min_listen_time and
-                        self._silencio_count >= 4):
+                if (self._silencio_count >= 4 and
+                        (self._voice_detected or
+                         agora - self._inicio_gravacao >= self._min_listen_time)):
                     debug.log(f"silence detected after {self._silencio_count} checks, rms={rms:.5f}")
                     self._parar_gravacao()
-            else:
-                self._silencio_count = 0
             self._audio_rms = rms
         except Exception as e:
             import traceback
