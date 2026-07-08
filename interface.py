@@ -1153,12 +1153,14 @@ class LuizaApp(App[None]):
                 self.call_from_thread(self._voltar_idle)
                 return
 
+            voice_match_id = None
+            voice_match_name = None
             if texto and reconhecimento_voz.modelo_carregado():
                 child_id_voz = reconhecimento_voz.identificar_crianca(audio)
                 if child_id_voz and child_id_voz != assistente.child_id_ativo:
-                    assistente.child_id_ativo = child_id_voz
-                    assistente.mem = memoria.carregar(child_id_voz)
-                    debug.log(f"voice_id: crianca identificada por voz: {child_id_voz[:12]}...")
+                    voice_match_id = child_id_voz
+                    voice_match_name = reconhecimento_voz.obter_nome_por_id(child_id_voz)
+                    debug.log(f"voice_id: possivel match: {child_id_voz[:12]}... ({voice_match_name})")
 
             self.call_from_thread(self._atualizar_stt, texto)
             self.call_from_thread(self._mudar_expressao, "pensando")

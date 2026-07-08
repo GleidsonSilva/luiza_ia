@@ -286,6 +286,14 @@ def marcar_assinatura_confirmada(child_id: str) -> None:
 
 
 
+def obter_nome_por_id(child_id: str) -> str:
+    """Retorna o nome salvo para um child_id, ou string vazia."""
+    assin = obter_assinatura(child_id)
+    if assin:
+        return assin.get("nome", "")
+    return ""
+
+
 def obter_qtd_embeddings(child_id: str) -> int:
     """Retorna quantas amostras de voz existem no pool desta crianca."""
     assin = obter_assinatura(child_id)

@@ -573,10 +573,33 @@ def _executar_pergunta_matematica(args: dict) -> str:
         return f"Erro ao gerar pergunta: {e}"
 
 
-def perguntar(texto: str, audio: Optional[np.ndarray] = None) -> str:
+def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Optional[str] = None, voice_match_name: str = "") -> str:
     global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
+
+    # Se a voz parece ser de outra crianca, carrega a memoria dela para contexto
+    # mas NAO troca a crianca ativa — a LLM precisa confirmar primeiro
+    if voice_match_id and voice_match_name:
+        mem_match = memoria.carregar(voice_match_id)
+        memoria_match_str = memoria.formatar_para_prompt(mem_match)
+        if memoria_match_str:
+            system_content += (
+                f"\n\n### ATENCAO - CONFIRMACAO DE IDENTIDADE\n"
+                f"A voz capturada PARECE ser de {voice_match_name}. "
+                f"Isso pode ser a mesma crianca de antes ou uma diferente.\n"
+                f"Memoria suspeita:\n{memoria_match_str}\n\n"
+                f"REGRAS:\n"
+                f"1. ANTES de responder qualquer pergunta da crianca, CONFIRME a identidade perguntando: "
+                f"'Você é o/a {voice_match_name}?'\n"
+                f"2. Se a crianca CONFIRMAR ('sim', 'sou eu'): use lembrar_nome com {voice_match_name} "
+                f"para carregar os dados certos\n"
+                f"3. Se a crianca NEGAR ou der outro nome: pergunte qual o nome dela e use lembrar_nome "
+                f"com o nome correto\n"
+                f"4. NUNCA trate a crianca como {voice_match_name} sem confirmacao explicita\n"
+                f"\nEsta regra de confirmacao eh obrigatoria. "
+                f"Considere tambem chamar registrar_voz se a identificacao por voz parecer util."
+            )
 
     memoria_recuperada = memoria.formatar_para_prompt(mem)
     if memoria_recuperada:
