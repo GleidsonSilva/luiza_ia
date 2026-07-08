@@ -1,4 +1,4 @@
-import sys, os, json, tempfile, select, time, re, threading, hashlib
+import sys, os, json, select, time, re, threading, hashlib
 from typing import Optional
 
 os.environ["HF_HUB_OFFLINE"] = "1"
@@ -12,7 +12,6 @@ tqdm.std.TqdmDefaultWriteLock.create_mp_lock = classmethod(
 from datetime import datetime
 import numpy as np
 import sounddevice as sd
-import soundfile as sf
 import mlx_whisper
 import requests
 from kokoro_onnx import Kokoro
@@ -452,15 +451,11 @@ def transcrever(audio: np.ndarray) -> str:
         gain = min(MAX_GAIN, TARGET_PEAK / peak)
         audio = audio * gain
 
-    tmp = tempfile.mktemp(suffix=".wav")
-    sf.write(tmp, audio, SR)
-
     r = mlx_whisper.transcribe(
-        tmp, language="pt",
+        audio, language="pt",
         path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
         initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
     )
-    os.remove(tmp)
     texto = r["text"].strip()
     debug.log(f"whisper raw: '{texto}'")
     if not texto or not (re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I) or re.search(r'^\d+$', texto.strip())):
