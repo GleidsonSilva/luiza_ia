@@ -949,8 +949,12 @@ def _apply_fade(audio: np.ndarray, sr: int) -> np.ndarray:
     return audio
 
 
+ultima_metricas_tts = {"gen": 0.0, "primeiro_audio": 0.0, "playback": 0.0}
+
+
 def falar(texto: str):
     global stream
+    t_chamada = time.time()
     was_streaming = stream is not None
     if stream:
         parar_stream()
@@ -978,8 +982,10 @@ def falar(texto: str):
                 debug.log(f"falar: erro ao reiniciar stream: {e}")
         return
 
-    debug.log(f"falar: iniciando playback, samples={len(samples)}")
+    gen = time.time() - t_chamada
+    debug.log(f"falar: iniciando playback, samples={len(samples)} gen={gen:.2f}s")
     t0 = time.time()
+    t_play = time.time()
 
     blocksize = 1024
     idx = 0
@@ -1014,7 +1020,11 @@ def falar(texto: str):
     except Exception as e:
         debug.log(f"falar error: {e}")
     finally:
-        debug.log(f"falar: playback finalizado em {time.time()-t0:.2f}s")
+        playback = time.time() - t0
+        ultima_metricas_tts["gen"] = gen
+        ultima_metricas_tts["primeiro_audio"] = t_play - t_chamada
+        ultima_metricas_tts["playback"] = playback
+        debug.log(f"falar: gen={gen:.2f}s primeiro_audio={t_play - t_chamada:.2f}s playback={playback:.2f}s")
         if was_streaming:
             try:
                 iniciar_stream()
