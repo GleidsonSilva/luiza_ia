@@ -415,7 +415,7 @@ if _ultimo_child_id:
 else:
     child_id_ativo: Optional[str] = None
 _identidade_confirmada = False
-session_id, historico = historico.carregar_ativa()
+session_id, historico_sessao = historico.carregar_ativa()
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
@@ -603,7 +603,7 @@ def _sortear_brincadeira(mem: dict) -> str:
 
 
 def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Optional[str] = None, voice_match_name: str = "") -> str:
-    global historico, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
+    global historico_sessao, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
 
     system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
 
@@ -641,7 +641,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
 
     orcamento = ctx_mgr.calcular_orcamento(MODEL)
     historico_janela = ctx_mgr.aplicar_janela_deslizante(
-        historico, limite_tokens=orcamento["history_recent"]
+        historico_sessao, limite_tokens=orcamento["history_recent"]
     )
     messages.extend(historico_janela)
 
@@ -655,7 +655,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
         return "Desculpe, a conversa ficou muito longa. Vamos comecar de novo?"
     if check["acao"] == "compactar":
         if turnos_desde_compactacao >= COMPACTION_THRESHOLD:
-            resumo = compactar_historico(historico)
+            resumo = compactar_historico(historico_sessao)
             if resumo:
                 resumo_sessao = resumo
                 turnos_desde_compactacao = 0
@@ -921,8 +921,8 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
     if child_id_ativo:
         _salvar_ultimo_child(child_id_ativo, mem.get("crianca", {}).get("nome", ""))
 
-    historico.append({"role": "user", "content": texto})
-    historico.append({"role": "assistant", "content": resposta})
+    historico_sessao.append({"role": "user", "content": texto})
+    historico_sessao.append({"role": "assistant", "content": resposta})
     try:
         historico.salvar_mensagem(session_id, "user", texto, child_id=child_id_ativo)
         historico.salvar_mensagem(session_id, "assistant", resposta, child_id=child_id_ativo)
@@ -930,8 +930,8 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
         debug.log(f"erro_historico_salvar: {e}")
 
     max_hist = MAX_HISTORICO_TURNOS * 2
-    if len(historico) > max_hist:
-        historico = historico[-max_hist:]
+    if len(historico_sessao) > max_hist:
+        historico_sessao = historico_sessao[-max_hist:]
 
     turnos_desde_compactacao += 1
 
