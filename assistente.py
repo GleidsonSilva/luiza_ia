@@ -27,7 +27,7 @@ MAX_DURATION = 15
 TARGET_PEAK = 0.95
 MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "gemma4:e4b"
+MODEL = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
 MAX_HISTORICO_TURNOS = 10
 
 # mlx_whisper/Metal nao suporta inferencias concorrentes no mesmo modelo.
