@@ -1030,34 +1030,36 @@ class LuizaApp(App[None]):
         self.gravando = False
         self.processando = True
         self._mudar_expressao("transcrevendo")
-        with assistente.buf_lock:
-            effective_idx = min(self.recording_idx, len(assistente.buf))
-            chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
-            debug.log(f"_parar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx} "
-                       f"effective_idx={effective_idx} chunks={len(chunks)}")
-        if not chunks:
-            # Tenta esperar um pouco o buffer encher
-            for _ in range(5):
-                time.sleep(0.2)
-                with assistente.buf_lock:
-                    effective_idx = min(self.recording_idx, len(assistente.buf))
-                    chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
-                    debug.log(f"_parar_gravacao: retry buf_len={len(assistente.buf)} chunks={len(chunks)}")
-                if chunks:
-                    break
+        gen = self._proc_gen
+        recording_idx = self.recording_idx
+        threading.Thread(target=self._coletar_e_processar,
+                         args=(recording_idx, gen), daemon=True).start()
+
+    def _coletar_e_processar(self, recording_idx, gen):
+        chunks = []
+        effective_idx = recording_idx
+        for tentativa in range(6):
+            with assistente.buf_lock:
+                effective_idx = min(recording_idx, len(assistente.buf))
+                chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
+                buf_len = len(assistente.buf)
+            debug.log(f"_parar_gravacao: tentativa={tentativa} buf_len={buf_len} "
+                      f"recording_idx={recording_idx} effective_idx={effective_idx} chunks={len(chunks)}")
+            if chunks:
+                break
+            time.sleep(0.2)
         if not chunks:
             debug.log("_parar_gravacao: sem audio novo, voltando ao repouso")
-            self.processando = False
-            self.recording_idx = 0
-            self._mudar_expressao("idle")
+            if gen == self._proc_gen:
+                self.processando = False
+                self.recording_idx = 0
+                self.call_from_thread(self._voltar_idle)
             return
         audio = np.concatenate(chunks)
         with assistente.buf_lock:
             del assistente.buf[:effective_idx]
-            self.recording_idx = 0
-        gen = self._proc_gen
-        threading.Thread(target=self._processar, args=(audio, gen),
-                         daemon=True).start()
+        self.recording_idx = 0
+        self._processar(audio, gen)
 
     def _finalizar_escuta_sem_voz(self):
         self._silencio_timer.pause()
