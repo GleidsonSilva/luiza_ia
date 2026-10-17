@@ -29,6 +29,36 @@ MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
 KEEP_ALIVE = os.environ.get("LUZIA_KEEP_ALIVE", "30m")
+
+# Roteador de intencao (decision model Clef) que decide se o turno precisa de
+# raciocinio (think=true) ou e conversa simples (think=false, bem mais rapido).
+ROUTER_URL = "http://localhost:11434/v1/systemone"
+ROUTER_MODEL = os.environ.get("LUZIA_ROUTER_MODEL", "clef-flash")
+ROUTER_ENABLED = os.environ.get("LUZIA_ROUTER", "1").lower() not in ("0", "false", "no")
+THINK_PADRAO = os.environ.get("LUZIA_THINK", "true").lower() not in ("0", "false", "no")
+
+_CATEGORIAS_QUESTAO = {
+    "acao": {
+        "type": "choice",
+        "instructions": (
+            "CONTEXTO: A Luiza e uma amiga de 8 anos que conversa com criancas em portugues do Brasil. "
+            "Ela tem estes recursos: (1) MEMORIA - salvar, lembrar ou esquecer fatos da crianca "
+            "(nome, idade, cor, bichinho, brinquedo, comida, cidade, escola, amigo); (2) BRINCADEIRAS - "
+            "sortear e conduzir jogos (forca, adivinhacao, 20 perguntas, rimas, etc.); (3) CALCULADORA - "
+            "contas de somar/subtrair; (4) CLIMA - tempo de uma cidade; (5) WEB - pesquisar fatos que "
+            "ela nao sabe. Quando houver 'ultima_fala_luiza', ela situa a conversa (a crianca pode estar "
+            "respondendo a ela). Classifique a fala da crianca em UMA categoria, pensando em qual recurso "
+            "da Luiza deve entrar em acao."
+        ),
+        "criteria": {
+            "conversa": "Bate-papo simples, saudacao, desabafo, opiniao ou pergunta casual que a Luiza responde apenas conversando, sem usar nenhum recurso acima.",
+            "brincadeira": "A crianca quer brincar ou jogar, pede uma brincadeira ou aceita uma proposta de brincar.",
+            "memoria": "A crianca diz, pede para lembrar ou pede para esquecer dados sobre si mesma (nome, idade, gostos, bichinho, amigo, escola).",
+            "conta": "A crianca pede um calculo ou envia uma conta de somar/subtrair.",
+            "clima_web": "A crianca pergunta o clima ou um fato/assunto que exige buscar informacao na internet.",
+        },
+    }
+}
 MAX_HISTORICO_TURNOS = 10
 
 # mlx_whisper/Metal nao suporta inferencias concorrentes no mesmo modelo.
@@ -458,14 +488,37 @@ def transcrever(audio: np.ndarray) -> str:
     return texto
 
 
+def _classificar_acao(texto: str, contexto: str = "") -> str:
+    """Usa o Clef (decision model) para rotular a intencao do turno."""
+    if not ROUTER_ENABLED:
+        return "?"
+    estado = {"fala_crianca": texto}
+    if contexto:
+        estado["ultima_fala_luiza"] = contexto
+    try:
+        r = requests.post(ROUTER_URL, json={
+            "model": ROUTER_MODEL,
+            "state": estado,
+            "questions": _CATEGORIAS_QUESTAO,
+        }, timeout=10)
+        r.raise_for_status()
+        return (r.json().get("answers", {}).get("acao", {}) or {}).get("choice", "?")
+    except Exception as e:
+        debug.log(f"roteador: falha na classificacao: {e}")
+        return "?"
+
+
 def _call_ollama(messages: list[dict], tools: list | None = None,
-                 max_retries: int = 2, timeout: int = 60) -> dict:
+                 max_retries: int = 2, timeout: int = 60, think: bool | None = None) -> dict:
     for attempt in range(max_retries + 1):
         try:
-            r = requests.post(OLLAMA_URL, json={
+            payload = {
                 "model": MODEL, "messages": messages, "tools": tools, "stream": False,
                 "keep_alive": KEEP_ALIVE,
-            }, timeout=timeout)
+            }
+            if think is not None:
+                payload["think"] = think
+            r = requests.post(OLLAMA_URL, json=payload, timeout=timeout)
             r.raise_for_status()
             body = r.json()
             msg = body.get("message")
@@ -481,17 +534,32 @@ def _call_ollama(messages: list[dict], tools: list | None = None,
 
 
 def aquecer_modelo():
-    """Carrega o modelo no Ollama em background para o 1o turno nao pagar o cold start."""
-    def _warm():
+    """Carrega o modelo e compila os grafos (think on/off) em background."""
+    def _warm_llm(think):
         try:
             requests.post(OLLAMA_URL, json={
-                "model": MODEL, "messages": [{"role": "user", "content": "oi"}],
-                "stream": False, "keep_alive": KEEP_ALIVE,
-                "options": {"num_predict": 1},
+                "model": MODEL,
+                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                             {"role": "user", "content": "oi"}],
+                "tools": tools, "stream": False, "keep_alive": KEEP_ALIVE,
+                "think": think, "options": {"num_predict": 1},
             }, timeout=300)
-            debug.log("aquecer_modelo: modelo carregado")
+            debug.log(f"aquecer_modelo: llm pronto (think={think})")
         except Exception as e:
-            debug.log(f"aquecer_modelo: falhou: {e}")
+            debug.log(f"aquecer_modelo: llm think={think} falhou: {e}")
+
+    def _warm():
+        _warm_llm(False)
+        _warm_llm(True)
+        if ROUTER_ENABLED:
+            try:
+                requests.post(ROUTER_URL, json={
+                    "model": ROUTER_MODEL, "state": {"fala_crianca": "oi"},
+                    "questions": _CATEGORIAS_QUESTAO,
+                }, timeout=300)
+                debug.log("aquecer_modelo: roteador carregado")
+            except Exception as e:
+                debug.log(f"aquecer_modelo: roteador falhou: {e}")
     threading.Thread(target=_warm, daemon=True).start()
 
 
@@ -687,11 +755,20 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
     max_iters = 3
     iters = 0
 
+    ultima_luiza = ""
+    for _m in reversed(historico_sessao):
+        if _m.get("role") == "assistant":
+            ultima_luiza = _m.get("content", "")
+            break
+    categoria = _classificar_acao(texto, ultima_luiza)
+    usar_think = THINK_PADRAO and categoria != "conversa"
+    debug.log(f"roteador: '{texto[:40]}' -> categoria={categoria} think={usar_think}")
+
     while iters < max_iters:
         iters += 1
         try:
             debug.log(f"--- iteracao {iters}/{max_iters}: chamando LLM...")
-            msg = _call_ollama(messages, tools=tools)
+            msg = _call_ollama(messages, tools=tools, think=usar_think)
         except Exception as e:
             debug.log(f"Ollama falhou apos retries: {e}")
             resposta = "Desculpe, tive um problema para pensar agora. Pode tentar de novo?"
