@@ -5,6 +5,7 @@ from typing import Optional
 
 HISTORICO_DIR = "historico"
 SESSION_ATIVA_PATH = os.path.join(HISTORICO_DIR, "session_ativa.json")
+MAX_SESSOES = 120
 
 _dir_criado = False
 
@@ -14,6 +15,29 @@ def _garantir_dirs():
     if not _dir_criado:
         os.makedirs(HISTORICO_DIR, exist_ok=True)
         _dir_criado = True
+
+
+def _podar_sessoes() -> None:
+    """Remove as sessoes mais antigas quando passa do limite."""
+    max_sessoes = MAX_SESSOES
+    if max_sessoes <= 0:
+        return
+    try:
+        nomes = [f for f in os.listdir(HISTORICO_DIR) if f.endswith(".jsonl")]
+        if len(nomes) <= max_sessoes:
+            return
+        caminhos = [os.path.join(HISTORICO_DIR, n) for n in nomes]
+        caminhos.sort(key=os.path.getmtime)
+        excedente = len(caminhos) - max_sessoes
+        for path in caminhos[:excedente]:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        import debug as _debug
+        _debug.log(f"historico: podadas {excedente} sessoes antigas (max={max_sessoes})")
+    except Exception:
+        pass
 
 
 def _caminho(session_id: str) -> str:
@@ -70,6 +94,7 @@ def nova_sessao(child_id: Optional[str] = None) -> str:
         "session_id": session_id,
     })
     marcar_ativa(session_id)
+    _podar_sessoes()
     return session_id
 
 
@@ -160,7 +185,5 @@ def buscar(query: str = "", child_id: Optional[str] = None, max_results: int = 5
             if q and q not in obj.get("content", "").lower():
                 continue
             resultados.append(obj)
-    if len(resultados) > max_results:
-        resultados = resultados[:max_results]
     resultados.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-    return resultados
+    return resultados[:max_results]
