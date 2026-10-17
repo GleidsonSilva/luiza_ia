@@ -28,6 +28,7 @@ TARGET_PEAK = 0.95
 MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
+KEEP_ALIVE = os.environ.get("LUZIA_KEEP_ALIVE", "30m")
 MAX_HISTORICO_TURNOS = 10
 
 # mlx_whisper/Metal nao suporta inferencias concorrentes no mesmo modelo.
@@ -463,6 +464,7 @@ def _call_ollama(messages: list[dict], tools: list | None = None,
         try:
             r = requests.post(OLLAMA_URL, json={
                 "model": MODEL, "messages": messages, "tools": tools, "stream": False,
+                "keep_alive": KEEP_ALIVE,
             }, timeout=timeout)
             r.raise_for_status()
             body = r.json()
@@ -476,6 +478,21 @@ def _call_ollama(messages: list[dict], tools: list | None = None,
                 time.sleep(1 * (attempt + 1))
             else:
                 raise
+
+
+def aquecer_modelo():
+    """Carrega o modelo no Ollama em background para o 1o turno nao pagar o cold start."""
+    def _warm():
+        try:
+            requests.post(OLLAMA_URL, json={
+                "model": MODEL, "messages": [{"role": "user", "content": "oi"}],
+                "stream": False, "keep_alive": KEEP_ALIVE,
+                "options": {"num_predict": 1},
+            }, timeout=300)
+            debug.log("aquecer_modelo: modelo carregado")
+        except Exception as e:
+            debug.log(f"aquecer_modelo: falhou: {e}")
+    threading.Thread(target=_warm, daemon=True).start()
 
 
 def compactar_historico(historico_para_resumir: list[dict]) -> str:
@@ -497,6 +514,7 @@ def compactar_historico(historico_para_resumir: list[dict]) -> str:
     try:
         r = requests.post(OLLAMA_URL, json={
             "model": MODEL, "messages": messages, "stream": False,
+            "keep_alive": KEEP_ALIVE,
             "options": {"temperature": 0.3, "max_tokens": 300},
         }, timeout=60)
         body = r.json()
