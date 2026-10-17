@@ -53,6 +53,7 @@ class VADBuffer:
 W, H = 120, 72
 FX, FY = 60, 43
 MAX_RECORD_SECONDS = 60.0
+SILENCIO_TICKS_PARA_PARAR = 3  # ticks de 0,5s sem voz para encerrar o turno (~1,5s)
 
 PELE = Color(255, 200, 160)
 NARIZ = Color(235, 180, 145)
@@ -786,6 +787,7 @@ class LuizaApp(App[None]):
         }
         assistente._identidade_confirmada = False
         assistente.iniciar_stream()
+        assistente.aquecer_modelo()
         if self._wake_enabled:
             import detector_palavra
             detector_palavra.start(callback=self._wake_check)
@@ -1141,10 +1143,10 @@ class LuizaApp(App[None]):
                 self._ultimo_voice_ts = agora
             else:
                 self._silencio_count += 1
-                if self._silencio_count >= 4:
+                if self._silencio_count >= SILENCIO_TICKS_PARA_PARAR:
                     if self._voice_detected:
                         parou_apos = agora - self._ultimo_voice_ts
-                        debug.log(f"voice ended, silence 2s, rms={rms:.5f}, parou_apos_ultima_voz={parou_apos:.2f}s")
+                        debug.log(f"voice ended, silence {SILENCIO_TICKS_PARA_PARAR*0.5:.1f}s, rms={rms:.5f}, parou_apos_ultima_voz={parou_apos:.2f}s")
                         self._parar_gravacao()
                     elif agora - self._inicio_gravacao >= self._min_listen_time:
                         debug.log(f"timeout, no voice, rms={rms:.5f}")
@@ -1207,8 +1209,6 @@ class LuizaApp(App[None]):
             t_llm = time.time() - t1
             debug.log(f"_processar: llm={t_llm:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
-
-            time.sleep(1)
 
             if gen != self._proc_gen:
                 debug.log("_processar_impl: thread obsoleta apos LLM, abortando")
