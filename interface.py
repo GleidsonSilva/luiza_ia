@@ -5,6 +5,7 @@ import assistente
 import memoria
 import debug
 import reconhecimento_voz
+import watchdog
 
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
@@ -792,8 +793,18 @@ class LuizaApp(App[None]):
         self._agendar_piscar()
         self._agendar_olhar()
         self._agendar_bocejo()
+        watchdog.start(state_provider=self._watchdog_estado)
+        self.set_interval(1.0, watchdog.beat)
         self._atualizar_rosto()
         self._saudacao_inicial()
+
+    def _watchdog_estado(self):
+        return {
+            "gravando": self.gravando,
+            "processando": self.processando,
+            "idle": self._em_idle,
+            "proc_gen": self._proc_gen,
+        }
 
     def _agendar_piscar(self):
         self.set_timer(random.uniform(8, 15), self._piscar)
@@ -1177,7 +1188,11 @@ class LuizaApp(App[None]):
 
             debug.log("chamando perguntar...")
             t1 = time.time()
-            resposta = assistente.perguntar(texto, audio=audio)
+            resposta = assistente.perguntar(
+                texto, audio=audio,
+                voice_match_id=voice_match_id,
+                voice_match_name=voice_match_name,
+            )
             debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
