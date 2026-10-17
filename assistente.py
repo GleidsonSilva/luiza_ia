@@ -29,6 +29,10 @@ MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
 MAX_HISTORICO_TURNOS = 10
+
+# mlx_whisper/Metal nao suporta inferencias concorrentes no mesmo modelo.
+# Serializa o uso entre a transcricao principal e o detector de wake word.
+whisper_lock = threading.Lock()
 MIN_RMS_ENROLLMENT = 0.01
 COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 
@@ -451,11 +455,12 @@ def transcrever(audio: np.ndarray) -> str:
         gain = min(MAX_GAIN, TARGET_PEAK / peak)
         audio = audio * gain
 
-    r = mlx_whisper.transcribe(
-        audio, language="pt",
-        path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
-        initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
-    )
+    with whisper_lock:
+        r = mlx_whisper.transcribe(
+            audio, language="pt",
+            path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
+            initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
+        )
     texto = r["text"].strip()
     debug.log(f"whisper raw: '{texto}'")
     if not texto or not (re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I) or re.search(r'^\d+$', texto.strip())):

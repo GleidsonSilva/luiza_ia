@@ -48,12 +48,13 @@ def _transcrever_checar(audio: np.ndarray) -> bool:
     tmp = tempfile.mktemp(suffix=".wav")
     sf.write(tmp, clip, SR)
     try:
-        result = mlx_whisper.transcribe(
-            tmp,
-            language="pt",
-            path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
-            initial_prompt="luiza ola luiza ei luiza"
-        )
+        with assistente.whisper_lock:
+            result = mlx_whisper.transcribe(
+                tmp,
+                language="pt",
+                path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
+                initial_prompt="luiza ola luiza ei luiza"
+            )
         texto = (result.get("text") or "").strip().lower()
         debug.log(f"detector_palavra: whisper='{texto}'")
         match = bool(_WAKE_RE.search(texto))
