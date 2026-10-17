@@ -45,7 +45,8 @@ def _transcrever_checar(audio: np.ndarray) -> bool:
     if peak > 0:
         clip = clip / peak * 0.95
 
-    tmp = tempfile.mktemp(suffix=".wav")
+    fd, tmp = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
     sf.write(tmp, clip, SR)
     try:
         with assistente.whisper_lock:
@@ -87,7 +88,8 @@ def _run():
                 time.sleep(0.5)
                 continue
 
-            if not assistente.stream or not assistente.stream.active:
+            stream = assistente.stream
+            if stream is None or not stream.active:
                 debug.log("detector_palavra: stream inativo")
                 time.sleep(1.0)
                 continue

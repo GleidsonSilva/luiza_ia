@@ -857,6 +857,10 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
 
     debug.log(f"perguntar: resposta final ({len(resposta)} chars): '{resposta[:80]}{'...' if len(resposta) > 80 else ''}'")
 
+    if not resposta:
+        resposta = "Hmm, me perdi no pensamento. Pode me contar de novo?"
+        debug.log("perguntar: resposta vazia da LLM, usando fallback")
+
     if child_id_ativo and reconhecimento_voz.verificar_re_enrollment(child_id_ativo, mem.get("crianca", {}).get("nome", "")):
         debug.log(f"voice_id: re-enrollment necessario para {child_id_ativo[:12]}...")
         try:

@@ -47,6 +47,7 @@ _modelo = None
 _fbank_matrix = None
 _modelo_lock = threading.Lock()
 _assinaturas = {}
+_assinaturas_carregadas = False
 _assinaturas_lock = threading.Lock()
 _interacoes_confirmadas = {}
 _interacoes_lock = threading.Lock()
@@ -153,19 +154,19 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def _carregar_assinaturas() -> dict:
-    global _assinaturas
-    if _assinaturas:
+    global _assinaturas, _assinaturas_carregadas
+    if _assinaturas_carregadas:
         return _assinaturas
     with _assinaturas_lock:
-        if _assinaturas:
+        if _assinaturas_carregadas:
             return _assinaturas
+        _assinaturas = {}
         if os.path.exists(ASSINATURAS_PATH):
             try:
                 with open(ASSINATURAS_PATH, "r") as f:
                     dados = json.load(f)
                 raw = dados.get("assinaturas", {})
                 # Migrar formato antigo (embedding unico) para pool de embeddings
-                _assinaturas = {}
                 for cid, val in raw.items():
                     entry = dict(val)
                     if "embedding" in entry and "embeddings" not in entry:
@@ -176,6 +177,7 @@ def _carregar_assinaturas() -> dict:
             except Exception as e:
                 debug_log(f"reconhecimento_voz: erro ao carregar assinaturas: {e}")
                 _assinaturas = {}
+        _assinaturas_carregadas = True
         return _assinaturas
 
 
@@ -237,6 +239,7 @@ def identificar_crianca(audio: np.ndarray) -> Optional[str]:
 
 
 def salvar_assinatura(child_id: str, nome: str, audio: np.ndarray, baixa_confianca: bool = False) -> bool:
+    global _assinaturas
     if _modelo is None or _fbank_matrix is None:
         debug_log("reconhecimento_voz: modelo nao carregado, nao foi possivel salvar assinatura")
         return False
@@ -278,6 +281,7 @@ def obter_assinatura(child_id: str) -> Optional[dict]:
 
 
 def marcar_assinatura_confirmada(child_id: str) -> None:
+    global _assinaturas
     assinaturas = _carregar_assinaturas()
     if child_id in assinaturas:
         assinaturas[child_id]["baixa_confianca"] = False
