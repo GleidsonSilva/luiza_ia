@@ -6,9 +6,18 @@ LIMITE_TOPICOS = 30
 LIMITE_JOGOS = 20
 LIMITE_TEMAS = 5
 
+_dir_criado = False
+
+
+def _garantir_dir():
+    global _dir_criado
+    if not _dir_criado:
+        os.makedirs(MEMORIAS_DIR, exist_ok=True)
+        _dir_criado = True
+
 
 def _path(child_id: Optional[str] = None) -> str:
-    os.makedirs(MEMORIAS_DIR, exist_ok=True)
+    _garantir_dir()
     nome = f"{child_id}.json" if child_id else "_anon.json"
     return os.path.join(MEMORIAS_DIR, nome)
 

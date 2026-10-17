@@ -6,9 +6,14 @@ from typing import Optional
 HISTORICO_DIR = "historico"
 SESSION_ATIVA_PATH = os.path.join(HISTORICO_DIR, "session_ativa.json")
 
+_dir_criado = False
+
 
 def _garantir_dirs():
-    os.makedirs(HISTORICO_DIR, exist_ok=True)
+    global _dir_criado
+    if not _dir_criado:
+        os.makedirs(HISTORICO_DIR, exist_ok=True)
+        _dir_criado = True
 
 
 def _caminho(session_id: str) -> str:
