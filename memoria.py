@@ -43,8 +43,10 @@ def salvar(mem: dict, child_id: Optional[str] = None):
     mem["historico_jogos"] = _dedup_ordenedado(mem.get("historico_jogos", []))[-LIMITE_JOGOS:]
     mem["ultimos_temas"] = _dedup_ordenedado(mem.get("ultimos_temas", []))[-LIMITE_TEMAS:]
     path = _path(child_id)
-    with open(path, "w") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(mem, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 def formatar_para_prompt(mem: dict) -> str:
