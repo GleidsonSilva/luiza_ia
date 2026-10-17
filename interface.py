@@ -1177,7 +1177,11 @@ class LuizaApp(App[None]):
 
             debug.log("chamando perguntar...")
             t1 = time.time()
-            resposta = assistente.perguntar(texto, audio=audio)
+            resposta = assistente.perguntar(
+                texto, audio=audio,
+                voice_match_id=voice_match_id,
+                voice_match_name=voice_match_name,
+            )
             debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
