@@ -51,6 +51,7 @@ class VADBuffer:
 
 W, H = 120, 72
 FX, FY = 60, 43
+MAX_RECORD_SECONDS = 60.0
 
 PELE = Color(255, 200, 160)
 NARIZ = Color(235, 180, 145)
@@ -1097,7 +1098,16 @@ class LuizaApp(App[None]):
             return
         try:
             agora = time.monotonic()
-            if agora - self._inicio_gravacao < 0.5:
+            duracao = agora - self._inicio_gravacao
+            if duracao < 0.5:
+                return
+            if duracao >= MAX_RECORD_SECONDS:
+                if self._voice_detected:
+                    debug.log(f"tempo maximo de gravacao ({duracao:.1f}s), parando")
+                    self._parar_gravacao()
+                else:
+                    debug.log(f"tempo maximo de gravacao ({duracao:.1f}s), sem voz")
+                    self._finalizar_escuta_sem_voz()
                 return
             with assistente.buf_lock:
                 recent = assistente.buf[self.recording_idx:]
