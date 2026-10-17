@@ -1,4 +1,4 @@
-import sys, os, json, select, time, re, threading, hashlib
+import sys, os, json, select, time, re, threading, hashlib, random
 from typing import Optional
 
 os.environ["HF_HUB_OFFLINE"] = "1"
@@ -100,12 +100,13 @@ CADA CRIANCA tem sua propria memoria separada. Voce precisa saber QUEM esta fala
 
 MEMORIA (voce decide quando usar):
 1. lembrar_nome: quando a crianca se apresenta explicitamente ("meu nome eh...", "sou o..."). Se for UM NOME DIFERENTE da crianca anterior, chame para trocar a crianca ativa. Se a crianca CORRIGIR o proprio nome (ex: "nao eh Ilona, eh Eloa"), use lembrar_nome com o nome correto — o sistema atualiza a identidade existente automaticamente.
-2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, topicos, brincadeiras). Carrega tudo da CRIANCA ATIVA.
+2. carregar_memoria: quando precisar lembrar de algo que a crianca ja contou (nome, idade, preferencias, topicos, brincadeiras). Carrega tudo da CRIANCA ATIVA (use para ver o JSON completo).
 3. salvar_memoria: quando a crianca compartilhar algo importante. Use o parametro categoria para escolher onde guardar:
    - categoria="crianca": fatos pessoais (nome, idade, cor, bichinho, brinquedo, comida, cidade)
    - categoria="topico": assuntos que interessam a crianca ("dinossauros", "futebol", "filmes")
    - categoria="jogo": brincadeiras que fizeram ("forca", "matematica", "adivinhacao")
    - categoria="tema": conversas recentes ("fim de semana", "viagem", "escola")
+   Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste').
 
 OUTRAS FERRAMENTAS:
 4. buscar_clima: quando pergunta sobre o tempo e voce sabe a cidade
@@ -130,36 +131,11 @@ REGRAS DE USO:
 - Se a crianca negar ou corrigir, chame `lembrar_nome` com o nome correto.
 - Se a identificacao por voz estiver falhando muito, voce pode chamar `registrar_voz` para atualizar a assinatura.
 
-### MEMORIA
-- Cada crianca tem sua propria memoria separada
-- A memoria fica automaticamente disponivel aqui no inicio de cada conversa. Voce ja ve o que sabe sobre a crianca
-- Quando a crianca se apresentar, chame lembrar_nome — o sistema ja carrega e mostra os dados dela na resposta
-- Se a crianca CORRIGIR o proprio nome (ex: "nao eh Ilona, eh Eloa"), chame lembrar_nome com o nome correto. O sistema atualiza a identidade existente automaticamente.
-- Use carregar_memoria para ver o JSON completo se precisar de mais detalhes
-- Use salvar_memoria com o parametro categoria para guardar:
-  * "crianca": nome, idade, cor favorita, bichinho, brinquedo, comida, cidade, escola, etc.
-  * "topico": assuntos que interessam a crianca e podem render conversa
-  * "jogo": brincadeiras que ja fizeram juntos
-  * "tema": ultimos assuntos que conversaram
-- Nao salve respostas curtas ('sim', 'nao') nem opinioes momentaneas ('hoje estou triste')
-- Use o nome da crianca SEMPRE que possivel
-
 ### BRINCADEIRAS (se a crianca pedir)
-- forca: palavras curtas (max 6 letras), diga o numero de letras, sem nomes proprios
-- matematica: use pergunta_matematica para gerar conta de soma/subtracao com 1 digito. Pergunte o resultado. Se acertar, elogie. Se errar, mostre a resposta correta com carinho
-- adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
-- numeros em ingles: pergunte como se fala os numeros de 1 a 10 em ingles de forma divertida. Se errar, repita a forma correta com carinho
-- adivinhacao: pense em algo simples (animal, objeto, comida) e de dicas uma de cada vez
-- 20 perguntas: deixe a crianca fazer perguntas para adivinhar o que voce pensou
-- cadeia de palavras: uma pessoa fala uma palavra, a proxima fala outra que comeca com a ultima letra
-- o que sou eu: voce pensa em algo, a crianca pergunta se eh animal, objeto, comida etc.
-- verdadeiro ou falso: voce fala uma frase, crianca diz se acha verdade ou mentira
-- rima comigo: voce fala uma palavra simples, crianca tenta achar uma que rima
-- categorias/stop: escolha uma categoria (frutas, animais), crianca fala palavras ate alguem falar stop ou repetir
-- complete a frase: voce comeca uma frase curta e a crianca completa
-- historia coletiva: voce comeca uma frase de historia e a crianca continua
-- detetive: descreva um cenario simples, crianca descobre o que aconteceu
-- palavra secreta: escolha uma palavra curta, crianca tenta adivinhar com dicas
+- Quando a crianca quiser brincar, chame `sortear_brincadeira` para sortear uma brincadeira variada (evita repetir as ultimas). Nao escolha voce mesma.
+- A ferramenta devolve o nome e uma dica de como conduzir; siga a dica.
+- Conduza leve: uma dica/rodada por vez, elogie quando acertar e ajude com carinho quando errar.
+- matematica: use `pergunta_matematica`; se acertar elogie, se errar mostre a resposta com carinho.
 
 ### CONTEXTO
 - Data, hora e periodo do dia sao informados automaticamente pra voce
@@ -381,6 +357,18 @@ tools = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "sortear_brincadeira",
+            "description": "Sorteia uma brincadeira para jogar com a crianca, evitando repetir as ultimas que ja jogaram. Use SEMPRE que a crianca pedir para brincar ou quando for comecar uma brincadeira nova. Retorna o nome da brincadeira e uma dica de como conduzir. O jogo sorteado ja fica registrado automaticamente — nao precisa salvar depois.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
@@ -572,6 +560,46 @@ def _executar_pergunta_matematica(args: dict) -> str:
         return f"pergunta|{expressao} = ?|resposta|{total}"
     except Exception as e:
         return f"Erro ao gerar pergunta: {e}"
+
+
+BRINCADEIRAS = [
+    {"nome": "forca", "dica": "uma palavra curta (max 6 letras, sem nomes proprios); diga o numero de letras"},
+    {"nome": "adivinhacao", "dica": "pense em algo simples (animal, objeto ou comida) e de uma dica por vez"},
+    {"nome": "20 perguntas", "dica": "a crianca faz perguntas para adivinhar o que voce pensou"},
+    {"nome": "cadeia de palavras", "dica": "cada um fala uma palavra que comeca com a ultima letra da anterior"},
+    {"nome": "rima comigo", "dica": "voce fala uma palavra simples e a crianca tenta achar uma que rima"},
+    {"nome": "complete a frase", "dica": "comece uma frase curta e a crianca continua"},
+    {"nome": "historia coletiva", "dica": "comece uma frase de historia e a crianca continua"},
+    {"nome": "detetive", "dica": "descreva um cenario simples e a crianca descobre o que aconteceu"},
+    {"nome": "palavra secreta", "dica": "escolha uma palavra curta e de dicas ate a crianca acertar"},
+    {"nome": "categorias (stop)", "dica": "escolha uma categoria e digam palavras ate alguem errar ou repetir"},
+    {"nome": "verdadeiro ou falso", "dica": "diga uma frase e a crianca diz se acha verdade ou mentira"},
+    {"nome": "numeros em ingles", "dica": "brinque com os numeros de 1 a 10 em ingles e ajude com carinho"},
+    {"nome": "o que sou eu", "dica": "voce pensa em algo e a crianca pergunta se e animal, objeto ou comida"},
+    {"nome": "eu vejo algo", "dica": "diga 'eu vejo algo que e...' e de dicas de cor/formato ate acertar"},
+    {"nome": "pedra papel tesoura", "dica": "joguem rodadas de pedra, papel e tesoura"},
+    {"nome": "quiz de animais", "dica": "faca perguntas simples sobre animais (onde vive, o que come)"},
+    {"nome": "historias malucas", "dica": "cada um acrescenta uma frase absurda na historia"},
+    {"nome": "matematica", "dica": "use pergunta_matematica para gerar a conta e conduza a brincadeira"},
+]
+
+JANELA_NAO_REPETIR = 4
+
+
+def _sortear_brincadeira(mem: dict) -> str:
+    recentes = [str(x).strip().lower() for x in mem.get("historico_jogos", [])]
+    ultimas = recentes[-JANELA_NAO_REPETIR:]
+    disponiveis = [b for b in BRINCADEIRAS if b["nome"].lower() not in ultimas]
+    if not disponiveis:
+        ultima = recentes[-1] if recentes else ""
+        disponiveis = [b for b in BRINCADEIRAS if b["nome"].lower() != ultima] or BRINCADEIRAS
+    escolhida = random.choice(disponiveis)
+    memoria.adicionar_fato(mem, "", escolhida["nome"], "jogo")
+    return (
+        f"Brincadeira sorteada: {escolhida['nome']}. "
+        f"Como conduzir: {escolhida['dica']}. "
+        f"Comece a brincadeira agora, naturalmente, sem mencionar o sorteio."
+    )
 
 
 def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Optional[str] = None, voice_match_name: str = "") -> str:
@@ -791,6 +819,10 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
             elif name == "pergunta_matematica":
                 result = _executar_pergunta_matematica(args)
                 debug.log(f"tool: pergunta_matematica -> {result}")
+            elif name == "sortear_brincadeira":
+                result = _sortear_brincadeira(mem)
+                needs_rerun = True
+                debug.log(f"tool: sortear_brincadeira -> {result}")
             elif name == "buscar_historico":
                 arg_q = args.get("query", "")
                 arg_child = args.get("child_id") or None
