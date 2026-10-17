@@ -1014,9 +1014,8 @@ class LuizaApp(App[None]):
         self.gravando = True
         self._voice_detected = False
         self._vad.clear()
-        with assistente.buf_lock:
-            self.recording_idx = len(assistente.buf)
-            debug.log(f"_iniciar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx}")
+        self.recording_idx = assistente.marca_atual()
+        debug.log(f"_iniciar_gravacao: marca={self.recording_idx}")
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
@@ -1031,20 +1030,15 @@ class LuizaApp(App[None]):
         self.processando = True
         self._mudar_expressao("transcrevendo")
         gen = self._proc_gen
-        recording_idx = self.recording_idx
+        marca = self.recording_idx
         threading.Thread(target=self._coletar_e_processar,
-                         args=(recording_idx, gen), daemon=True).start()
+                         args=(marca, gen), daemon=True).start()
 
-    def _coletar_e_processar(self, recording_idx, gen):
+    def _coletar_e_processar(self, marca, gen):
         chunks = []
-        effective_idx = recording_idx
         for tentativa in range(6):
-            with assistente.buf_lock:
-                effective_idx = min(recording_idx, len(assistente.buf))
-                chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
-                buf_len = len(assistente.buf)
-            debug.log(f"_parar_gravacao: tentativa={tentativa} buf_len={buf_len} "
-                      f"recording_idx={recording_idx} effective_idx={effective_idx} chunks={len(chunks)}")
+            chunks = assistente.ler_desde(marca)
+            debug.log(f"_parar_gravacao: tentativa={tentativa} marca={marca} chunks={len(chunks)}")
             if chunks:
                 break
             time.sleep(0.2)
@@ -1056,8 +1050,7 @@ class LuizaApp(App[None]):
                 self.call_from_thread(self._voltar_idle)
             return
         audio = np.concatenate(chunks)
-        with assistente.buf_lock:
-            del assistente.buf[:effective_idx]
+        assistente.descartar_ate(marca)
         self.recording_idx = 0
         self._processar(audio, gen)
 
@@ -1113,8 +1106,7 @@ class LuizaApp(App[None]):
                     debug.log(f"tempo maximo de gravacao ({duracao:.1f}s), sem voz")
                     self._finalizar_escuta_sem_voz()
                 return
-            with assistente.buf_lock:
-                recent = assistente.buf[self.recording_idx:]
+            recent = assistente.ler_desde(self.recording_idx)
             if not recent:
                 return
             for chunk in recent:
