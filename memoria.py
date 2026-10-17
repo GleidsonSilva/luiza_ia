@@ -6,9 +6,18 @@ LIMITE_TOPICOS = 30
 LIMITE_JOGOS = 20
 LIMITE_TEMAS = 5
 
+_dir_criado = False
+
+
+def _garantir_dir():
+    global _dir_criado
+    if not _dir_criado:
+        os.makedirs(MEMORIAS_DIR, exist_ok=True)
+        _dir_criado = True
+
 
 def _path(child_id: Optional[str] = None) -> str:
-    os.makedirs(MEMORIAS_DIR, exist_ok=True)
+    _garantir_dir()
     nome = f"{child_id}.json" if child_id else "_anon.json"
     return os.path.join(MEMORIAS_DIR, nome)
 
@@ -43,8 +52,10 @@ def salvar(mem: dict, child_id: Optional[str] = None):
     mem["historico_jogos"] = _dedup_ordenedado(mem.get("historico_jogos", []))[-LIMITE_JOGOS:]
     mem["ultimos_temas"] = _dedup_ordenedado(mem.get("ultimos_temas", []))[-LIMITE_TEMAS:]
     path = _path(child_id)
-    with open(path, "w") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(mem, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 def formatar_para_prompt(mem: dict) -> str:
@@ -76,7 +87,8 @@ def formatar_para_prompt(mem: dict) -> str:
 
 
 def adicionar_fato(mem: dict, chave: str, valor: str, categoria: str = "crianca") -> tuple[dict, str]:
-    valor_final = valor.strip().capitalize()
+    v = valor.strip()
+    valor_final = (v[:1].upper() + v[1:]) if v else v
     if categoria == "crianca":
         mem["crianca"][chave] = valor_final
     elif categoria == "topico":

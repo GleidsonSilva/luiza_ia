@@ -89,18 +89,19 @@ def modelo_carregado() -> bool:
 
 def _compute_fbank(audio: np.ndarray) -> np.ndarray:
     audio = np.pad(audio, (WIN_LENGTH // 2, WIN_LENGTH // 2), mode='constant')
-    frames = []
-    for i in range(0, len(audio) - WIN_LENGTH + 1, HOP_LENGTH):
-        frames.append(audio[i:i + WIN_LENGTH])
-    frames = np.array(frames, dtype=np.float32)
-    
+    n_frames = 1 + (len(audio) - WIN_LENGTH) // HOP_LENGTH
+    if n_frames <= 0:
+        return np.empty((0, N_MELS), dtype=np.float32)
+    idx = np.arange(WIN_LENGTH)[None, :] + HOP_LENGTH * np.arange(n_frames)[:, None]
+    frames = audio[idx].astype(np.float32)
+
     window = np.hanning(WIN_LENGTH).astype(np.float32)
     stft = np.fft.rfft(frames * window, n=N_FFT, axis=1)
     magnitudes = np.abs(stft) ** 2
-    
+
     mel_spectrogram = np.dot(magnitudes, _fbank_matrix.T)
     log_mel = np.log(np.maximum(mel_spectrogram, 1e-10))
-    
+
     return log_mel.astype(np.float32)
 
 

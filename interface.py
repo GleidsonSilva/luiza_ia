@@ -776,6 +776,13 @@ class LuizaApp(App[None]):
         yield Static("\[Espaço/Enter] Falar  \[Diga 'Luiza'] Ativar  \[Esc] Sair", id="hint")
 
     def on_mount(self):
+        self._canvas = self.query_one("#rosto", Canvas)
+        self._status = self.query_one("#status", Static)
+        self._ctx = self.query_one("#ctx-usage", Static)
+        self._bubbles_widgets = {
+            "stt-text": self.query_one("#stt-text", Static),
+            "tts-text": self.query_one("#tts-text", Static),
+        }
         assistente._identidade_confirmada = False
         assistente.iniciar_stream()
         if self._wake_enabled:
@@ -908,7 +915,7 @@ class LuizaApp(App[None]):
     def _atualizar_rosto(self):
         if self.expressao == "falando" and self._mouth_target_h is not None:
             self._mouth_h += (self._mouth_target_h - self._mouth_h) * 0.55
-        canvas = self.query_one("#rosto", Canvas)
+        canvas = self._canvas
         with canvas.batch_refresh():
             desenhar_rosto(canvas, self.expressao, self._frame_boca,
                            self._piscando, self._olho_dir,
@@ -940,7 +947,7 @@ class LuizaApp(App[None]):
         self._trans_total = dur
         self._trans_timer.resume()
         self._atualizar_rosto()
-        status = self.query_one("#status", Static)
+        status = self._status
         if expressao == "idle" and assistente.obter_nome_crianca():
             nome = assistente.obter_nome_crianca()
             status.update(f"[#7a1f18]{nome}[/] | {STATUS_MAP.get(expressao, '')}")
@@ -948,7 +955,7 @@ class LuizaApp(App[None]):
             status.update(STATUS_MAP.get(expressao, ""))
         if expressao == "idle":
             try:
-                self.query_one("#tts-text", Static).remove_class("bubble-erro")
+                self._bubbles_widgets["tts-text"].remove_class("bubble-erro")
             except Exception:
                 pass
         if expressao == "falando":
@@ -970,7 +977,7 @@ class LuizaApp(App[None]):
 
     def _start_typing(self, widget_id, text, speed=0.04, is_error=False, label=""):
         self._cancel_typing(widget_id)
-        target = self.query_one(f"#{widget_id}", Static)
+        target = self._bubbles_widgets.get(widget_id) or self.query_one(f"#{widget_id}", Static)
         if is_error:
             target.add_class("bubble-erro")
         else:
@@ -1255,7 +1262,7 @@ class LuizaApp(App[None]):
             cor = "#999"
         texto = f"[{cor}] {k_tokens:.1f}K / {k_limite:.0f}K  {pct:.0%} ctx[/]"
         try:
-            self.query_one("#ctx-usage", Static).update(texto)
+            self._ctx.update(texto)
         except Exception:
             pass
 
@@ -1271,8 +1278,7 @@ class LuizaApp(App[None]):
         }
         label = nomes_amigaveis.get(nome, f"Usando {nome}...")
         try:
-            status = self.query_one("#status", Static)
-            status.update(f"[#FF9800]🔧 {label}[/]")
+            self._status.update(f"[#FF9800]🔧 {label}[/]")
         except Exception:
             pass
 
@@ -1285,5 +1291,4 @@ class LuizaApp(App[None]):
         self._mudar_expressao("idle")
         nome = assistente.obter_nome_crianca()
         if nome:
-            status = self.query_one("#status", Static)
-            status.update(f"[#7a1f18]{nome}[/] | {STATUS_MAP.get('idle', '')}")
+            self._status.update(f"[#7a1f18]{nome}[/] | {STATUS_MAP.get('idle', '')}")
