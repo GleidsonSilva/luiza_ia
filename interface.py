@@ -704,7 +704,7 @@ class LuizaApp(App[None]):
                 return
             self.call_from_thread(self.action_toggle_recording)
         elif self._wake_enabled:
-            return not self.gravando and not self.processando and self.expressao == "idle"
+            return not self.gravando and not self.processando and self._em_idle
         return True
 
     def action_quit(self):
@@ -761,6 +761,7 @@ class LuizaApp(App[None]):
         self._min_listen_time = 5.0
         self._voice_detected = False
         self._proc_gen = 0
+        self._em_idle = True
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -913,6 +914,7 @@ class LuizaApp(App[None]):
             self._boca_delay_timer.cancel()
             self._boca_delay_timer = None
         self.expressao = expressao
+        self._em_idle = expressao == "idle"
         self._frame_boca = 0
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
