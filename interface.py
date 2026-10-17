@@ -760,6 +760,7 @@ class LuizaApp(App[None]):
         self._auto_listen_enabled = False
         self._min_listen_time = 5.0
         self._voice_detected = False
+        self._proc_gen = 0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -1054,7 +1055,8 @@ class LuizaApp(App[None]):
         with assistente.buf_lock:
             del assistente.buf[:effective_idx]
             self.recording_idx = 0
-        threading.Thread(target=self._processar, args=(audio,),
+        gen = self._proc_gen
+        threading.Thread(target=self._processar, args=(audio, gen),
                          daemon=True).start()
 
     def _finalizar_escuta_sem_voz(self):
@@ -1138,21 +1140,19 @@ class LuizaApp(App[None]):
             traceback.print_exc(file=tb)
             debug.log(f"_verificar_silencio ERRO: {e}\n{tb.getvalue()}")
 
-    def _processar(self, audio):
-        t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
+    def _processar(self, audio, gen):
+        t = threading.Thread(target=self._processar_impl, args=(audio, gen), daemon=True)
         t.start()
         t.join(timeout=180.0)
         if t.is_alive():
             sd.stop()
             debug.log("_processar: timeout")
-            try:
-                t.join(timeout=5.0)
-            except Exception:
-                pass
+            # Invalida callbacks da thread orfa para nao mexer no estado
+            self._proc_gen += 1
             self.processando = False
             self.call_from_thread(self._voltar_idle)
 
-    def _processar_impl(self, audio):
+    def _processar_impl(self, audio, gen):
         t0_total = time.time()
         self._auto_listen_enabled = False
         try:
@@ -1161,6 +1161,10 @@ class LuizaApp(App[None]):
             debug.log(f"_processar: stt={time.time()-t0_total:.2f}s texto='{texto}'")
             if not texto:
                 self.call_from_thread(self._voltar_idle)
+                return
+
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta apos STT, abortando")
                 return
 
             voice_match_id = None
@@ -1183,6 +1187,10 @@ class LuizaApp(App[None]):
 
             time.sleep(1)
 
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta apos LLM, abortando")
+                return
+
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
 
@@ -1198,10 +1206,13 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts_erro, f"Erro: {e}")
         finally:
             debug.log("_processar finalizando")
-            if self._auto_listen_enabled:
-                self._auto_listen_event.set()
-            self.call_from_thread(self._voltar_idle)
-            self.processando = False
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta, callbacks ignorados")
+            else:
+                if self._auto_listen_enabled:
+                    self._auto_listen_event.set()
+                self.call_from_thread(self._voltar_idle)
+                self.processando = False
 
     def _atualizar_stt(self, texto):
         if texto:
