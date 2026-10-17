@@ -29,6 +29,10 @@ MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma4:e4b"
 MAX_HISTORICO_TURNOS = 10
+
+# mlx_whisper/Metal nao suporta inferencias concorrentes no mesmo modelo.
+# Serializa o uso entre a transcricao principal e o detector de wake word.
+whisper_lock = threading.Lock()
 MIN_RMS_ENROLLMENT = 0.01
 COMPACTION_THRESHOLD = ctx_mgr.COMPACTION_THRESHOLD_TURNS
 
@@ -451,11 +455,12 @@ def transcrever(audio: np.ndarray) -> str:
         gain = min(MAX_GAIN, TARGET_PEAK / peak)
         audio = audio * gain
 
-    r = mlx_whisper.transcribe(
-        audio, language="pt",
-        path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
-        initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
-    )
+    with whisper_lock:
+        r = mlx_whisper.transcribe(
+            audio, language="pt",
+            path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
+            initial_prompt="ola vamos brincar qual e o seu nome voce gosta de jogar que historia legal"
+        )
     texto = r["text"].strip()
     debug.log(f"whisper raw: '{texto}'")
     if not texto or not (re.search(r'[aeiouáéíóúâêîôûãõ]', texto, re.I) or re.search(r'^\d+$', texto.strip())):
@@ -852,6 +857,10 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
 
     debug.log(f"perguntar: resposta final ({len(resposta)} chars): '{resposta[:80]}{'...' if len(resposta) > 80 else ''}'")
 
+    if not resposta:
+        resposta = "Hmm, me perdi no pensamento. Pode me contar de novo?"
+        debug.log("perguntar: resposta vazia da LLM, usando fallback")
+
     if child_id_ativo and reconhecimento_voz.verificar_re_enrollment(child_id_ativo, mem.get("crianca", {}).get("nome", "")):
         debug.log(f"voice_id: re-enrollment necessario para {child_id_ativo[:12]}...")
         try:
@@ -989,6 +998,7 @@ def key_pressed() -> bool:
 
 buf_lock = threading.Lock()
 buf = []
+buf_base = 0
 stream = None
 nome_crianca = ""
 _accum = np.array([], dtype=np.float32)
@@ -999,7 +1009,7 @@ _ACCUM_TARGET = 1024
 
 
 def _stream_callback(indata, frames, time, status):
-    global _accum
+    global _accum, buf_base
     _accum = np.concatenate([_accum, indata.ravel()])
     if len(_accum) < _ACCUM_TARGET:
         return
@@ -1010,14 +1020,39 @@ def _stream_callback(indata, frames, time, status):
         if len(buf) > BUF_MAX_CHUNKS:
             excesso = len(buf) - BUF_MAX_CHUNKS
             del buf[:excesso]
+            buf_base += excesso
+
+
+def marca_atual() -> int:
+    """Indice global do proximo chunk a ser gravado (estavel mesmo com poda)."""
+    with buf_lock:
+        return buf_base + len(buf)
+
+
+def ler_desde(marca: int) -> list:
+    """Retorna os chunks gravados a partir de uma marca global."""
+    with buf_lock:
+        local = max(0, marca - buf_base)
+        return list(buf[local:])
+
+
+def descartar_ate(marca: int) -> None:
+    """Descarta do buffer tudo antes da marca global informada."""
+    global buf_base
+    with buf_lock:
+        local = max(0, min(marca - buf_base, len(buf)))
+        if local > 0:
+            del buf[:local]
+            buf_base += local
 
 
 def iniciar_stream():
-    global stream, buf, nome_crianca, _accum
+    global stream, buf, nome_crianca, _accum, buf_base
     nome_crianca = mem.get("crianca", {}).get("nome", "")
     with buf_lock:
         _accum = np.array([], dtype=np.float32)
         buf = []
+        buf_base = 0
     stream = sd.InputStream(samplerate=SR, channels=1, dtype="float32",
                             callback=_stream_callback)
     stream.start()

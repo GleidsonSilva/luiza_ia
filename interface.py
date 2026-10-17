@@ -51,6 +51,7 @@ class VADBuffer:
 
 W, H = 120, 72
 FX, FY = 60, 43
+MAX_RECORD_SECONDS = 60.0
 
 PELE = Color(255, 200, 160)
 NARIZ = Color(235, 180, 145)
@@ -703,7 +704,7 @@ class LuizaApp(App[None]):
                 return
             self.call_from_thread(self.action_toggle_recording)
         elif self._wake_enabled:
-            return not self.gravando and not self.processando and self.expressao == "idle"
+            return not self.gravando and not self.processando and self._em_idle
         return True
 
     def action_quit(self):
@@ -759,6 +760,8 @@ class LuizaApp(App[None]):
         self._auto_listen_enabled = False
         self._min_listen_time = 5.0
         self._voice_detected = False
+        self._proc_gen = 0
+        self._em_idle = True
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -911,6 +914,7 @@ class LuizaApp(App[None]):
             self._boca_delay_timer.cancel()
             self._boca_delay_timer = None
         self.expressao = expressao
+        self._em_idle = expressao == "idle"
         self._frame_boca = 0
         self._mouth_h = 2.0
         self._mouth_target_h = 2.0
@@ -1012,9 +1016,8 @@ class LuizaApp(App[None]):
         self.gravando = True
         self._voice_detected = False
         self._vad.clear()
-        with assistente.buf_lock:
-            self.recording_idx = len(assistente.buf)
-            debug.log(f"_iniciar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx}")
+        self.recording_idx = assistente.marca_atual()
+        debug.log(f"_iniciar_gravacao: marca={self.recording_idx}")
         self._silencio_count = 0
         self._silencio_timer.resume()
         self._mudar_expressao("ouvindo")
@@ -1028,33 +1031,30 @@ class LuizaApp(App[None]):
         self.gravando = False
         self.processando = True
         self._mudar_expressao("transcrevendo")
-        with assistente.buf_lock:
-            effective_idx = min(self.recording_idx, len(assistente.buf))
-            chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
-            debug.log(f"_parar_gravacao: buf_len={len(assistente.buf)} recording_idx={self.recording_idx} "
-                       f"effective_idx={effective_idx} chunks={len(chunks)}")
-        if not chunks:
-            # Tenta esperar um pouco o buffer encher
-            for _ in range(5):
-                time.sleep(0.2)
-                with assistente.buf_lock:
-                    effective_idx = min(self.recording_idx, len(assistente.buf))
-                    chunks = assistente.buf[effective_idx:] if effective_idx < len(assistente.buf) else []
-                    debug.log(f"_parar_gravacao: retry buf_len={len(assistente.buf)} chunks={len(chunks)}")
-                if chunks:
-                    break
+        gen = self._proc_gen
+        marca = self.recording_idx
+        threading.Thread(target=self._coletar_e_processar,
+                         args=(marca, gen), daemon=True).start()
+
+    def _coletar_e_processar(self, marca, gen):
+        chunks = []
+        for tentativa in range(6):
+            chunks = assistente.ler_desde(marca)
+            debug.log(f"_parar_gravacao: tentativa={tentativa} marca={marca} chunks={len(chunks)}")
+            if chunks:
+                break
+            time.sleep(0.2)
         if not chunks:
             debug.log("_parar_gravacao: sem audio novo, voltando ao repouso")
-            self.processando = False
-            self.recording_idx = 0
-            self._mudar_expressao("idle")
+            if gen == self._proc_gen:
+                self.processando = False
+                self.recording_idx = 0
+                self.call_from_thread(self._voltar_idle)
             return
         audio = np.concatenate(chunks)
-        with assistente.buf_lock:
-            del assistente.buf[:effective_idx]
-            self.recording_idx = 0
-        threading.Thread(target=self._processar, args=(audio,),
-                         daemon=True).start()
+        assistente.descartar_ate(marca)
+        self.recording_idx = 0
+        self._processar(audio, gen)
 
     def _finalizar_escuta_sem_voz(self):
         self._silencio_timer.pause()
@@ -1097,10 +1097,18 @@ class LuizaApp(App[None]):
             return
         try:
             agora = time.monotonic()
-            if agora - self._inicio_gravacao < 0.5:
+            duracao = agora - self._inicio_gravacao
+            if duracao < 0.5:
                 return
-            with assistente.buf_lock:
-                recent = assistente.buf[self.recording_idx:]
+            if duracao >= MAX_RECORD_SECONDS:
+                if self._voice_detected:
+                    debug.log(f"tempo maximo de gravacao ({duracao:.1f}s), parando")
+                    self._parar_gravacao()
+                else:
+                    debug.log(f"tempo maximo de gravacao ({duracao:.1f}s), sem voz")
+                    self._finalizar_escuta_sem_voz()
+                return
+            recent = assistente.ler_desde(self.recording_idx)
             if not recent:
                 return
             for chunk in recent:
@@ -1128,21 +1136,19 @@ class LuizaApp(App[None]):
             traceback.print_exc(file=tb)
             debug.log(f"_verificar_silencio ERRO: {e}\n{tb.getvalue()}")
 
-    def _processar(self, audio):
-        t = threading.Thread(target=self._processar_impl, args=(audio,), daemon=True)
+    def _processar(self, audio, gen):
+        t = threading.Thread(target=self._processar_impl, args=(audio, gen), daemon=True)
         t.start()
         t.join(timeout=180.0)
         if t.is_alive():
             sd.stop()
             debug.log("_processar: timeout")
-            try:
-                t.join(timeout=5.0)
-            except Exception:
-                pass
+            # Invalida callbacks da thread orfa para nao mexer no estado
+            self._proc_gen += 1
             self.processando = False
             self.call_from_thread(self._voltar_idle)
 
-    def _processar_impl(self, audio):
+    def _processar_impl(self, audio, gen):
         t0_total = time.time()
         self._auto_listen_enabled = False
         try:
@@ -1151,6 +1157,10 @@ class LuizaApp(App[None]):
             debug.log(f"_processar: stt={time.time()-t0_total:.2f}s texto='{texto}'")
             if not texto:
                 self.call_from_thread(self._voltar_idle)
+                return
+
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta apos STT, abortando")
                 return
 
             voice_match_id = None
@@ -1173,6 +1183,10 @@ class LuizaApp(App[None]):
 
             time.sleep(1)
 
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta apos LLM, abortando")
+                return
+
             self.call_from_thread(self._mudar_expressao, "falando")
             self.call_from_thread(self._atualizar_tts, resposta)
 
@@ -1188,10 +1202,13 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts_erro, f"Erro: {e}")
         finally:
             debug.log("_processar finalizando")
-            if self._auto_listen_enabled:
-                self._auto_listen_event.set()
-            self.call_from_thread(self._voltar_idle)
-            self.processando = False
+            if gen != self._proc_gen:
+                debug.log("_processar_impl: thread obsoleta, callbacks ignorados")
+            else:
+                if self._auto_listen_enabled:
+                    self._auto_listen_event.set()
+                self.call_from_thread(self._voltar_idle)
+                self.processando = False
 
     def _atualizar_stt(self, texto):
         if texto:

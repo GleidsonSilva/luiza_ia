@@ -45,15 +45,17 @@ def _transcrever_checar(audio: np.ndarray) -> bool:
     if peak > 0:
         clip = clip / peak * 0.95
 
-    tmp = tempfile.mktemp(suffix=".wav")
+    fd, tmp = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
     sf.write(tmp, clip, SR)
     try:
-        result = mlx_whisper.transcribe(
-            tmp,
-            language="pt",
-            path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
-            initial_prompt="luiza ola luiza ei luiza"
-        )
+        with assistente.whisper_lock:
+            result = mlx_whisper.transcribe(
+                tmp,
+                language="pt",
+                path_or_hf_repo="mlx-community/whisper-large-v3-mlx",
+                initial_prompt="luiza ola luiza ei luiza"
+            )
         texto = (result.get("text") or "").strip().lower()
         debug.log(f"detector_palavra: whisper='{texto}'")
         match = bool(_WAKE_RE.search(texto))
@@ -86,7 +88,8 @@ def _run():
                 time.sleep(0.5)
                 continue
 
-            if not assistente.stream or not assistente.stream.active:
+            stream = assistente.stream
+            if stream is None or not stream.active:
                 debug.log("detector_palavra: stream inativo")
                 time.sleep(1.0)
                 continue

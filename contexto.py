@@ -1,5 +1,5 @@
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import threading
 import requests
 from ddgs import DDGS
 
@@ -33,17 +33,29 @@ def buscar_clima(cidade: str) -> str:
     except Exception as e:
         return f"Nao consegui buscar o clima de {cidade}. Erro: {e}"
 
-def buscar_web(consulta: str) -> str:
+def _buscar_web_worker(consulta: str, resultado: dict, pronto: threading.Event):
     try:
-        with DDGS(timeout=5) as ddgs:
-            with ThreadPoolExecutor() as pool:
-                future = pool.submit(ddgs.text, consulta, max_results=3, safesearch="moderate")
-                results = future.result(timeout=10)
-        if not results:
-            return f"Nao encontrei nada sobre '{consulta}'."
-        linhas = [f"- {r['title']}: {r['href']}" for r in results]
-        return f"Resultados da busca por '{consulta}':\n" + "\n".join(linhas)
-    except TimeoutError:
-        return f"A busca por '{consulta}' excedeu o tempo limite."
+        with DDGS(timeout=8) as ddgs:
+            resultado["data"] = list(ddgs.text(consulta, max_results=3, safesearch="moderate"))
     except Exception as e:
-        return f"Erro ao buscar '{consulta}': {e}"
+        resultado["erro"] = e
+    finally:
+        pronto.set()
+
+
+def buscar_web(consulta: str) -> str:
+    resultado = {}
+    pronto = threading.Event()
+    t = threading.Thread(
+        target=_buscar_web_worker, args=(consulta, resultado, pronto), daemon=True
+    )
+    t.start()
+    if not pronto.wait(timeout=12):
+        return f"A busca por '{consulta}' excedeu o tempo limite."
+    if "erro" in resultado:
+        return f"Erro ao buscar '{consulta}': {resultado['erro']}"
+    results = resultado.get("data", [])
+    if not results:
+        return f"Nao encontrei nada sobre '{consulta}'."
+    linhas = [f"- {r['title']}: {r['href']}" for r in results]
+    return f"Resultados da busca por '{consulta}':\n" + "\n".join(linhas)
