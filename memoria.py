@@ -87,7 +87,8 @@ def formatar_para_prompt(mem: dict) -> str:
 
 
 def adicionar_fato(mem: dict, chave: str, valor: str, categoria: str = "crianca") -> tuple[dict, str]:
-    valor_final = valor.strip().capitalize()
+    v = valor.strip()
+    valor_final = (v[:1].upper() + v[1:]) if v else v
     if categoria == "crianca":
         mem["crianca"][chave] = valor_final
     elif categoria == "topico":
