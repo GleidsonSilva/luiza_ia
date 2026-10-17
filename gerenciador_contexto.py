@@ -1,11 +1,18 @@
 
 MODEL_CONTEXT_LIMITS = {
+    "gpt-oss:20b": 131_072,
+    "gpt-oss:120b": 131_072,
     "gemma4:e4b": 131_072,
+    "gemma4:26b": 262_144,
     "gemma4:t4b": 262_144,
+    "qwen3.5:9b": 262_144,
+    "qwen3.5:4b": 262_144,
+    "glm-4.7-flash": 202_752,
     "gemma3:e1b": 32_768,
     "llama3:8b": 8_192,
     "mistral": 32_768,
 }
+DEFAULT_CONTEXT_LIMIT = 32_768
 
 DEFAULT_BUDGET_RATIOS = {
     "system_prompt": 0.04,
@@ -27,11 +34,15 @@ def estimar_tokens(texto: str) -> int:
 
 
 def get_context_limit(model: str) -> int:
-    base = model.split(":")[0]
+    if not model:
+        return DEFAULT_CONTEXT_LIMIT
+    if model in MODEL_CONTEXT_LIMITS:
+        return MODEL_CONTEXT_LIMITS[model]
+    base = model.split(":")[0].split("/")[-1]
     for key, limit in MODEL_CONTEXT_LIMITS.items():
-        if model == key or base == key.split(":")[0]:
+        if base == key.split(":")[0].split("/")[-1]:
             return limit
-    return 8_192
+    return DEFAULT_CONTEXT_LIMIT
 
 
 def calcular_orcamento(model: str) -> dict:

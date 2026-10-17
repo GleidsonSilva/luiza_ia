@@ -6,13 +6,14 @@ os.chdir(_SCRIPT_DIR)
 
 def _check_ollama():
     import requests
+    modelo = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
     try:
         r = requests.get("http://localhost:11434/api/tags", timeout=5)
         r.raise_for_status()
         modelos = [m["name"] for m in r.json().get("models", [])]
-        if "gemma4:e4b" not in modelos:
-            print("Erro: modelo 'gemma4:e4b' nao encontrado no Ollama.")
-            print("  Baixe com: ollama pull gemma4:e4b")
+        if modelo not in modelos:
+            print(f"Erro: modelo '{modelo}' nao encontrado no Ollama.")
+            print(f"  Baixe com: ollama pull {modelo}")
             return False
         return True
     except requests.ConnectionError:
