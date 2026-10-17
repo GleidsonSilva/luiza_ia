@@ -763,6 +763,7 @@ class LuizaApp(App[None]):
         self._voice_detected = False
         self._proc_gen = 0
         self._em_idle = True
+        self._ultimo_voice_ts = 0.0
 
     def compose(self) -> ComposeResult:
         with Container(id="face-wrapper"):
@@ -1137,11 +1138,13 @@ class LuizaApp(App[None]):
             if rms >= 0.015:
                 self._voice_detected = True
                 self._silencio_count = 0
+                self._ultimo_voice_ts = agora
             else:
                 self._silencio_count += 1
                 if self._silencio_count >= 4:
                     if self._voice_detected:
-                        debug.log(f"voice ended, silence 2s, rms={rms:.5f}")
+                        parou_apos = agora - self._ultimo_voice_ts
+                        debug.log(f"voice ended, silence 2s, rms={rms:.5f}, parou_apos_ultima_voz={parou_apos:.2f}s")
                         self._parar_gravacao()
                     elif agora - self._inicio_gravacao >= self._min_listen_time:
                         debug.log(f"timeout, no voice, rms={rms:.5f}")
@@ -1172,7 +1175,8 @@ class LuizaApp(App[None]):
         try:
             debug.log(f"_processar: audio shape={audio.shape}")
             texto = assistente.transcrever(audio)
-            debug.log(f"_processar: stt={time.time()-t0_total:.2f}s texto='{texto}'")
+            t_stt = time.time() - t0_total
+            debug.log(f"_processar: stt={t_stt:.2f}s texto='{texto}'")
             if not texto:
                 self.call_from_thread(self._voltar_idle)
                 return
@@ -1200,7 +1204,8 @@ class LuizaApp(App[None]):
                 voice_match_id=voice_match_id,
                 voice_match_name=voice_match_name,
             )
-            debug.log(f"_processar: llm={time.time()-t1:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
+            t_llm = time.time() - t1
+            debug.log(f"_processar: llm={t_llm:.2f}s total={time.time()-t0_total:.2f}s resposta='{resposta}'")
             self.call_from_thread(self._atualizar_ctx)
 
             time.sleep(1)
@@ -1213,8 +1218,16 @@ class LuizaApp(App[None]):
             self.call_from_thread(self._atualizar_tts, resposta)
 
             assistente.falar(resposta)
+            m = assistente.ultima_metricas_tts
+            total = time.time() - t0_total
+            primeiro_audio = total - m.get("playback", 0.0)
+            debug.log(
+                f"metricas_turno: stt={t_stt:.2f} llm={t_llm:.2f} "
+                f"tts_gen={m.get('gen', 0):.2f} primeiro_audio={primeiro_audio:.2f} "
+                f"playback={m.get('playback', 0):.2f} total={total:.2f}"
+            )
             self._auto_listen_enabled = True
-            debug.log(f"_processar: fim={time.time()-t0_total:.2f}s")
+            debug.log(f"_processar: fim={total:.2f}s")
         except Exception as e:
             import traceback
             import io
