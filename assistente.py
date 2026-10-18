@@ -691,7 +691,10 @@ def _sortear_brincadeira(mem: dict) -> str:
 def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Optional[str] = None, voice_match_name: str = "") -> str:
     global historico_sessao, _identidade_confirmada, resumo_sessao, turnos_desde_compactacao, mem, ultimo_ctx_status, child_id_ativo
 
-    system_content = SYSTEM_PROMPT + f"\n\n### AGORA\n{contexto.contexto_hoje()}"
+    # O system fica ESTAVEL entre turnos (para o cache de prefixo do Ollama).
+    # O contexto volatil (data/hora) vai na mensagem do usuario.
+    system_content = SYSTEM_PROMPT
+    texto_llm = f"{texto}\n\n### CONTEXTO_ATUAL\n{contexto.contexto_hoje()}"
 
     # Se a voz parece ser de outra crianca, carrega a memoria dela para contexto
     # mas NAO troca a crianca ativa — a LLM precisa confirmar primeiro
@@ -731,7 +734,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
     )
     messages.extend(historico_janela)
 
-    messages.append({"role": "user", "content": texto})
+    messages.append({"role": "user", "content": texto_llm})
 
     check = ctx_mgr.verificar_orcamento(messages, MODEL)
     ultimo_ctx_status = check
@@ -747,7 +750,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
                 turnos_desde_compactacao = 0
                 messages = [{"role": "system", "content": system_content}]
                 messages.extend(historico_janela)
-                messages.append({"role": "user", "content": texto})
+                messages.append({"role": "user", "content": texto_llm})
                 debug.log("compactacao aplicada")
 
     resposta = ""
