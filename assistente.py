@@ -178,6 +178,17 @@ REGRAS DE USO:
 - Se mencionar algo que voce nao conhece bem (animal, brinquedo, lugar, assunto), pesquise com buscar_web
 - Nao finja saber de algo que nao conhece — pesquise
 
+### REGRAS OBRIGATORIAS DE FERRAMENTAS (use SEMPRE, sem excecao)
+QUANDO A CRIANCA DIZ -> CHAME ESTA FERRAMENTA IMEDIATAMENTE:
+- "vamos brincar", "quero brincar", "brincadeira" -> sortear_brincadeira
+- "previsao", "tempo", "clima", "ta frio", "ta quente", "chuva" -> buscar_clima (se nao souber cidade, pergunte primeiro)
+- "meu nome eh", "sou o", "sou a", "me chamo" -> lembrar_nome
+- conta matematica (ex: "quanto eh", "soma", "multiplica", "divide") -> calculadora
+- pergunta de fato/assunto que voce nao sabe -> buscar_web
+
+NAO RESPONDA DIRETAMENTE PARA ESSES CASOS — CHAME A FERRAMENTA.
+A resposta so vem DEPOIS do resultado da ferramenta.
+
 ### HORARIOS E ROTINA
 - De vez em quando, se fizer sentido, pergunte sobre a rotina de forma natural
 - Nao fique cobrando toda hora sobre cafe, almoco, escovar dentes ou dormir
@@ -739,6 +750,17 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
     if resumo_sessao:
         system_content += f"\n\n### RESUMO_SESSAO\n{resumo_sessao}"
 
+    # regras de ferramenta como system message separado (perto do fim do contexto,
+    # pra nao ser "esquecido" pelo modelo conforme o historico cresce)
+    tool_rules = """### REGRAS OBRIGATORIAS DE FERRAMENTAS (use SEMPRE)
+QUANDO A CRIANCA DIZ -> CHAME ESTA FERRAMENTA IMEDIATAMENTE:
+- "vamos brincar", "quero brincar", "brincadeira", "vamos jogar", "jogar", "forca", "jogo", "brincar de" -> sortear_brincadeira
+- "previsao", "tempo", "clima", "ta frio", "ta quente", "chuva", "frio", "quente", "graus" -> buscar_clima (se nao souber cidade, pergunte primeiro)
+- "meu nome eh", "sou o", "sou a", "me chamo", "meu nome" -> lembrar_nome
+- conta matematica (ex: "quanto eh", "soma", "mais", "menos", "vezes", "multiplica", "divide") -> calculadora
+- pergunta de fato/assunto que voce nao sabe -> buscar_web
+NAO RESPONDA DIRETAMENTE PARA ESSES CASOS — CHAME A FERRAMENTA."""
+
     messages = [{"role": "system", "content": system_content}]
 
     orcamento = ctx_mgr.calcular_orcamento(MODEL)
@@ -746,6 +768,9 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
         historico_sessao, limite_tokens=orcamento["history_recent"]
     )
     messages.extend(historico_janela)
+
+    # injeta regras de ferramenta antes da mensagem do usuario
+    messages.append({"role": "system", "content": tool_rules})
 
     messages.append({"role": "user", "content": texto_llm})
 
@@ -763,6 +788,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
                 turnos_desde_compactacao = 0
                 messages = [{"role": "system", "content": system_content}]
                 messages.extend(historico_janela)
+                messages.append({"role": "system", "content": tool_rules})
                 messages.append({"role": "user", "content": texto_llm})
                 debug.log("compactacao aplicada")
 
