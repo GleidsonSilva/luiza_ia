@@ -6,7 +6,7 @@ os.chdir(_SCRIPT_DIR)
 
 def _check_ollama():
     import requests
-    modelo = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
+    modelo = os.environ.get("LUZIA_MODEL", "gemma4:26b")
     try:
         r = requests.get("http://localhost:11434/api/tags", timeout=5)
         r.raise_for_status()

@@ -27,15 +27,19 @@ MAX_DURATION = 15
 TARGET_PEAK = 0.95
 MAX_GAIN = 10.0
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = os.environ.get("LUZIA_MODEL", "gemma4:e4b")
+MODEL = os.environ.get("LUZIA_MODEL", "gemma4:26b")
 KEEP_ALIVE = os.environ.get("LUZIA_KEEP_ALIVE", "30m")
 
 # Roteador de intencao (decision model Clef) que decide se o turno precisa de
 # raciocinio (think=true) ou e conversa simples (think=false, bem mais rapido).
 ROUTER_URL = "http://localhost:11434/v1/systemone"
 ROUTER_MODEL = os.environ.get("LUZIA_ROUTER_MODEL", "clef-flash")
-ROUTER_ENABLED = os.environ.get("LUZIA_ROUTER", "1").lower() not in ("0", "false", "no")
-THINK_PADRAO = os.environ.get("LUZIA_THINK", "true").lower() not in ("0", "false", "no")
+ROUTER_ENABLED = os.environ.get("LUZIA_ROUTER", "0").lower() not in ("0", "false", "no")
+THINK_PADRAO = os.environ.get("LUZIA_THINK", "false").lower() not in ("0", "false", "no")
+
+# Categorias que realmente precisam de raciocinio (decidir/criar). As demais
+# (conversa, memoria, conta) respondem direto, sem thinking -> bem mais rapido.
+_CATEGORIAS_COM_THINK = {"brincadeira", "clima_web"}
 
 _CATEGORIAS_QUESTAO = {
     "acao": {
@@ -447,6 +451,11 @@ else:
     child_id_ativo: Optional[str] = None
 _identidade_confirmada = False
 session_id, historico_sessao = historico.carregar_ativa()
+# limita o historico carregado do disco (senao a 1a chamada envia centenas de
+# mensagens e o modelo fica lento)
+_max_hist_inicial = MAX_HISTORICO_TURNOS * 2
+if len(historico_sessao) > _max_hist_inicial:
+    historico_sessao = historico_sessao[-_max_hist_inicial:]
 resumo_sessao = ""
 turnos_desde_compactacao = 0
 ultimo_ctx_status = {"tokens": 0, "limit": 0, "pct": 0.0, "acao": "ok"}
@@ -542,15 +551,19 @@ def aquecer_modelo():
                 "messages": [{"role": "system", "content": SYSTEM_PROMPT},
                              {"role": "user", "content": "oi"}],
                 "tools": tools, "stream": False, "keep_alive": KEEP_ALIVE,
-                "think": think, "options": {"num_predict": 1},
+                "think": think,
             }, timeout=300)
             debug.log(f"aquecer_modelo: llm pronto (think={think})")
         except Exception as e:
             debug.log(f"aquecer_modelo: llm think={think} falhou: {e}")
 
     def _warm():
-        _warm_llm(False)
-        _warm_llm(True)
+        # as primeiras chamadas pagam a compilacao/page-in; aquece varias vezes
+        for _ in range(3):
+            _warm_llm(THINK_PADRAO)
+        if ROUTER_ENABLED and THINK_PADRAO:
+            _warm_llm(False)
+            _warm_llm(False)
         if ROUTER_ENABLED:
             try:
                 requests.post(ROUTER_URL, json={
@@ -764,7 +777,7 @@ def perguntar(texto: str, audio: Optional[np.ndarray] = None, voice_match_id: Op
             ultima_luiza = _m.get("content", "")
             break
     categoria = _classificar_acao(texto, ultima_luiza)
-    usar_think = THINK_PADRAO and categoria != "conversa"
+    usar_think = THINK_PADRAO and (categoria in _CATEGORIAS_COM_THINK or categoria == "?")
     debug.log(f"roteador: '{texto[:40]}' -> categoria={categoria} think={usar_think}")
 
     while iters < max_iters:
