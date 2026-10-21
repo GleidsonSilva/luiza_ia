@@ -555,26 +555,29 @@ def _call_ollama(messages: list[dict], tools: list | None = None,
 
 def aquecer_modelo():
     """Carrega o modelo e compila os grafos (think on/off) em background."""
-    def _warm_llm(think):
+    def _warm_llm(messages, think):
         try:
             requests.post(OLLAMA_URL, json={
                 "model": MODEL,
-                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                             {"role": "user", "content": "oi"}],
+                "messages": messages,
                 "tools": tools, "stream": False, "keep_alive": KEEP_ALIVE,
                 "think": think,
             }, timeout=300)
-            debug.log(f"aquecer_modelo: llm pronto (think={think})")
+            debug.log(f"aquecer_modelo: llm pronto (think={think}, msgs={len(messages)})")
         except Exception as e:
             debug.log(f"aquecer_modelo: llm think={think} falhou: {e}")
 
     def _warm():
-        # as primeiras chamadas pagam a compilacao/page-in; aquece varias vezes
-        for _ in range(3):
-            _warm_llm(THINK_PADRAO)
+        sys_msg = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # 1) saudação curta (resposta rápida)
+        _warm_llm(sys_msg + [{"role": "user", "content": "oi"}], THINK_PADRAO)
+        # 2) chamada de tool (buscar_clima) - exercita tool calling
+        _warm_llm(sys_msg + [{"role": "user", "content": "qual a previsao em Sao Paulo?"}], THINK_PADRAO)
+        # 3) resposta mais longa (conversa)
+        _warm_llm(sys_msg + [{"role": "user", "content": "conte uma historia curta sobre um gato"}], THINK_PADRAO)
         if ROUTER_ENABLED and THINK_PADRAO:
-            _warm_llm(False)
-            _warm_llm(False)
+            _warm_llm(sys_msg + [{"role": "user", "content": "oi"}], False)
+            _warm_llm(sys_msg + [{"role": "user", "content": "oi"}], False)
         if ROUTER_ENABLED:
             try:
                 requests.post(ROUTER_URL, json={
